@@ -1,0 +1,4 @@
+# The SGO atlas and value platform are PHP apps that need a PHP host (Hostinger).
+# Vercel only serves static files, so it can't run them. Without this file it publishes their
+# PHP source (including config.php) and encrypted data files as plain downloads.
+/sgo/
