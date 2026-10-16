@@ -34,7 +34,7 @@ shelf portal, and findings). It ships county and tract aggregates only: no site 
 census blocks, or licensed Map the Meal Gap values. Rebuild the bundle in the Maverick
 Intelligence repository with `uv run python -m mi.foodbridge_bundle`, copy `data/research.json`
 and `public/data/` into `apps/foodbridge/`, and redeploy that Vercel project.
-`portfolio/foodbridge/` redirects to the hosted app.
+`portfolio/foodbridge/` redirects to the hosted app at https://foodbridge-jet.vercel.app/.
 
 The other portfolio cards link to separate sites:
 
