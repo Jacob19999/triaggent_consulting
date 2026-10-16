@@ -43,6 +43,7 @@ export default function RequestsInbox() {
                   <Badge>{r.kind}</Badge>
                   <Badge tone={r.urgency === "high" ? "demo" : "neutral"}>{r.urgency} urgency</Badge>
                   <Badge tone={r.status === "fulfilled" ? "green" : "neutral"}>{r.status.replace("_", " ")}</Badge>
+                  {r.hypothetical && <Badge>hypothetical</Badge>}
                   <span className="ml-auto text-[12px] text-muted">{fmt.date(r.created_at)}</span>
                 </div>
                 <p className="mt-2 text-[14px] text-ink">{r.message}</p>

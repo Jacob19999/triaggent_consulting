@@ -123,7 +123,7 @@ export function AgentPanel({
       {result?.markdown && (
         <Card
           title={result.mode === "ai" ? "Briefing" : "Offline briefing"}
-          subtitle={`${monthLabel(asOf, "long")} · ${snapshot.workspace === "demo" ? "demo workspace (synthetic shelves)" : "live workspace"}`}
+          subtitle={`${monthLabel(asOf, "long")} · ${snapshot.workspace === "demo" ? "county networks (statewide extract)" : "live workspace"}`}
           actions={result.mode === "ai" ? <Badge tone="green">{result.model}</Badge> : <Badge>No model</Badge>}
         >
           {result.note && <p className="mb-2 text-[12.5px] text-muted">{result.note}</p>}

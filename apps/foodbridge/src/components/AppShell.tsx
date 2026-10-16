@@ -221,12 +221,12 @@ export function AppShell({ area, children }: { area: Area; children: ReactNode }
           <div className="rounded-lg bg-[var(--rail-2)] p-3 text-[11.5px] text-[var(--rail-muted)]">
             <div className="flex items-center gap-1.5 font-semibold text-[var(--rail-ink)]">
               <span className={cx("h-2 w-2 rounded-full", live ? "bg-[#3ccf9f]" : "bg-[var(--warning)]")} />
-              {live ? "Live workspace" : "Demo workspace"}
+              {live ? "Live workspace" : "County networks"}
             </div>
             <p className="mt-1 leading-snug">
               {live
                 ? `Signed in${session.email ? ` as ${session.email}` : ""} · ${session.liveRole}`
-                : "Synthetic demo shelves in this browser."}
+                : "Statewide extract by county (reporting-site totals), kept in this browser."}
             </p>
             <p className="mt-1.5 leading-snug">
               Research to {monthLabel(research.meta.observed_end)} · FEI {feiReady ? "loaded" : "pending"}. Aug 2026 values are
@@ -242,10 +242,14 @@ export function AppShell({ area, children }: { area: Area; children: ReactNode }
                   Sign in to live workspace
                 </button>
               ) : null}
+              {/* Plain link: /gate is a server route, not a client page. */}
+              <a className="underline" href="/gate?signout=1">
+                Lock portal
+              </a>
             </div>
           </div>
         ) : (
-          <div className="grid place-items-center py-1" title={live ? "Live workspace" : "Demo workspace"}>
+          <div className="grid place-items-center py-1" title={live ? "Live workspace" : "County networks"}>
             <span className={cx("h-2.5 w-2.5 rounded-full", live ? "bg-[#3ccf9f]" : "bg-[var(--warning)]")} />
           </div>
         )}
@@ -304,7 +308,7 @@ export function AppShell({ area, children }: { area: Area; children: ReactNode }
             <Icon name="search" className="h-4 w-4" />
           </button>
           <div className="hidden items-center gap-1.5 xl:flex">
-            {!live && <Badge tone="demo">Demo data</Badge>}
+            {!live && <Badge tone="demo">County aggregates</Badge>}
             <Badge>
               <Icon name="history" className="h-3 w-3" /> As of {monthLabel(asOf)}
             </Badge>
@@ -326,7 +330,7 @@ export function AppShell({ area, children }: { area: Area; children: ReactNode }
           <ThemeToggle />
           <span
             className="grid h-8 w-8 place-items-center rounded-full bg-surface-3 text-[11.5px] font-semibold text-ink-2 ring-1 ring-line"
-            title={live ? (session.email ?? "Signed in") : "Demo user"}
+            title={live ? (session.email ?? "Signed in") : "Local user"}
           >
             {live && session.email ? session.email.slice(0, 2).toUpperCase() : <Icon name="user" className="h-4 w-4" />}
           </span>

@@ -8,6 +8,7 @@
    Data colors were validated with the dataviz palette checker (signals pass all-pairs
    CVD and contrast in both modes). The theme is set on <html data-theme> before paint. */
 :root {
+  --map-audit: #67e8f9;
   color-scheme: light;
   --paper: #f2f4f7;
   --surface: #ffffff;
@@ -42,6 +43,11 @@
   --sig-households: #0b8f86;
   --sig-pounds: #b45309;
   --sig-individuals: #4f46e5;
+  /* Site types (Organization.AgencyType): chosen to stay visible on the blue heatmap ramp. */
+  --type-brick: #6a9a00;
+  --type-outreach: #d9650b;
+  --type-tribal: #c2337f;
+  --type-campus: #0e9488;
 
   --seq-1: #cde2fb;
   --seq-2: #86b6ef;
@@ -100,6 +106,10 @@
   --sig-households: #1fa197;
   --sig-pounds: #d17a24;
   --sig-individuals: #8079ec;
+  --type-brick: #c4e15a;
+  --type-outreach: #f5933a;
+  --type-tribal: #ef6fb4;
+  --type-campus: #3fd1c3;
   --seq-1: #184f95;
   --seq-2: #256abf;
   --seq-3: #3987e5;
@@ -344,6 +354,60 @@ input[type="radio"] {
   font-weight: 700;
   font-size: 11px;
   box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
+  transform: scale(var(--fb-count-scale, 1));
+  transition: transform 0.15s ease-out;
+}
+
+/* One reporting site at its researched coordinates (D-063); colour and glyph = AgencyType. */
+.fb-pin-type {
+  width: 18px;
+  height: 18px;
+  border-radius: 999px;
+  display: grid;
+  place-items: center;
+  background: var(--c);
+  box-shadow:
+    0 0 0 1.5px var(--surface),
+    0 1px 3px rgba(0, 0, 0, 0.4);
+  transform: scale(var(--fb-site-scale, 1));
+  transition: transform 0.15s ease-out;
+}
+.fb-pin-type svg {
+  width: 11px;
+  height: 11px;
+  fill: none;
+  stroke: #10202c;
+  stroke-width: 2.4;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+/* Area marker (city / ZIP centre): hollow with a dashed edge so it never reads as an address. */
+.fb-pin-type.is-approx {
+  background: color-mix(in srgb, var(--c) 22%, var(--surface));
+  box-shadow:
+    inset 0 0 0 1.5px var(--c),
+    0 1px 3px rgba(0, 0, 0, 0.3);
+  outline: 1px dashed var(--c);
+  outline-offset: 1px;
+}
+.fb-pin-type.is-approx svg {
+  stroke: var(--c);
+}
+.fb-pin-type.is-active {
+  box-shadow:
+    0 0 0 2px var(--surface),
+    0 0 0 3.5px var(--ink);
+}
+.fb-sites-compact .fb-pin-type svg {
+  display: none;
+}
+.fb-sites-compact .fb-pin-type.is-approx {
+  outline: none;
+}
+
+.fb-counts-compact .fb-pin-count {
+  color: transparent;
+  border-width: 1px;
 }
 
 @keyframes fb-pulse {

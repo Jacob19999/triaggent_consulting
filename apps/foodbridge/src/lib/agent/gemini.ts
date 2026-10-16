@@ -2,7 +2,7 @@ import "server-only";
 import type { GenerateContent, GeminiResponse } from "./run";
 
 export const DEFAULT_AI_MODEL = "gemini-flash-latest";
-export const FALLBACK_AI_MODEL = "gemini-flash-lite-latest";
+export const FALLBACK_AI_MODEL = "gemini-3.5-flash-lite";
 
 export class GeminiAPIError extends Error {
   constructor(public readonly status: number, public readonly code: string) {

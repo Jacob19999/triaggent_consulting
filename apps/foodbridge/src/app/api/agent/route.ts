@@ -4,6 +4,7 @@ import { offlineBriefing } from "@/lib/agent/fallback";
 import { MODE_PROMPTS } from "@/lib/agent/prompt";
 import { runAgent } from "@/lib/agent/run";
 import { createGeminiClient, DEFAULT_AI_MODEL, FALLBACK_AI_MODEL, GeminiAPIError } from "@/lib/agent/gemini";
+import { clientIp, limited } from "@/lib/agent/limit";
 import { Snapshot } from "@/lib/agent/tools";
 import { supabaseConfigured } from "@/lib/config";
 import { currentProfile } from "@/lib/supabase/server";
@@ -18,23 +19,6 @@ const Body = z.object({
   snapshot: Snapshot,
 });
 
-// Per-instance limiter: enough for a demo deployment. For durable limits across
-// instances, back this with Upstash Redis or Vercel KV (see README).
-const hits = new Map<string, number[]>();
-let daily = { day: "", count: 0 };
-function limited(ip: string): string | null {
-  const now = Date.now();
-  const recent = (hits.get(ip) ?? []).filter((t) => now - t < 10 * 60 * 1000);
-  if (recent.length >= Number(process.env.FOODBRIDGE_AI_PER_IP ?? 8)) return "Too many requests. Try again in a few minutes.";
-  const today = new Date().toISOString().slice(0, 10);
-  if (daily.day !== today) daily = { day: today, count: 0 };
-  if (daily.count >= Number(process.env.FOODBRIDGE_AI_DAILY_LIMIT ?? 300)) return "The daily AI limit for this deployment is reached.";
-  recent.push(now);
-  hits.set(ip, recent);
-  daily.count++;
-  return null;
-}
-
 export async function POST(req: NextRequest) {
   const raw = await req.text();
   if (raw.length > 120_000) return NextResponse.json({ error: "Request too large" }, { status: 413 });
@@ -45,8 +29,8 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Invalid request" }, { status: 400 });
   }
 
-  // Live workspaces require a signed-in, approved user. Demo workspaces carry only
-  // synthetic shelves and public research aggregates.
+  // Live workspaces require a signed-in, approved user. The county networks workspace
+  // carries only county aggregates, behind the portal password.
   if (body.snapshot.workspace === "live" || process.env.FOODBRIDGE_AI_REQUIRE_AUTH === "true") {
     const profile = supabaseConfigured ? await currentProfile() : null;
     if (!profile || profile.role === "pending") return NextResponse.json({ error: "Sign in to use the briefing agent." }, { status: 401 });
@@ -61,8 +45,7 @@ export async function POST(req: NextRequest) {
 
   const apiKey = process.env.GEMINI_API_KEY?.trim();
   if (!apiKey) return offline();
-  const ip = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? "local";
-  const limit = limited(ip);
+  const limit = limited(clientIp(req.headers));
   if (limit) return NextResponse.json({ error: limit }, { status: 429 });
 
   const model = process.env.FOODBRIDGE_AI_MODEL?.trim() || DEFAULT_AI_MODEL;
@@ -91,7 +74,7 @@ export async function POST(req: NextRequest) {
     if (result.status === "ok" && result.markdown)
       return NextResponse.json({
         mode: "ai", model: result.model, markdown: result.markdown, toolCalls: result.toolCalls,
-        ...(usedFallback ? { note: "Gemini Flash is busy; this summary uses Gemini Flash-Lite." } : {}),
+        ...(usedFallback ? { note: "Gemini Flash is busy; this summary uses Gemini 3.5 Flash Lite." } : {}),
       });
     return NextResponse.json({
       mode: "offline",

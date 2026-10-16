@@ -90,7 +90,7 @@ export function TimeChart({
         ))}
         {all.map((p, i) =>
           i === fi || (i % labelEvery === 0 && fi - i >= Math.ceil(labelEvery * 0.6)) ? (
-            <text key={p.month} x={x(i)} y={H - 8} textAnchor="middle" fontSize={10.5} fill="var(--muted)">
+            <text key={p.month} x={x(i)} y={H - 8} textAnchor={i === fi ? "end" : i === 0 ? "start" : "middle"} fontSize={10.5} fill="var(--muted)">
               {monthLabel(p.month)}
             </text>
           ) : null,
@@ -307,5 +307,77 @@ export function Radar({
         </figcaption>
       )}
     </figure>
+  );
+}
+
+/** Change against the same month a year earlier, one bar per month above or below zero. */
+export function ChangeBars({
+  points,
+  label,
+  height = 170,
+}: {
+  points: { month: string; value: number | null }[]; // fractional change, e.g. 0.12 = +12%
+  label: string;
+  height?: number;
+}) {
+  const W = 640;
+  const H = height;
+  const m = { l: 44, r: 8, t: 12, b: 24 };
+  const [hover, setHover] = useState<number | null>(null);
+  const peak = Math.max(0.1, ...points.map((p) => Math.abs(p.value ?? 0)));
+  const max = peak <= 0.1 ? 0.1 : peak <= 0.25 ? 0.25 : peak <= 0.5 ? 0.5 : Math.ceil(peak);
+  const step = (W - m.l - m.r) / Math.max(1, points.length);
+  const bw = Math.max(4, step * 0.62);
+  const y = (v: number) => m.t + ((max - v) / (2 * max)) * (H - m.t - m.b);
+  const labelEvery = Math.ceil(points.length / 6);
+  return (
+    <div className="relative">
+      <svg viewBox={`0 0 ${W} ${H}`} className="h-auto w-full" role="img" aria-label={`${label}, change on a year earlier by month`} onMouseLeave={() => setHover(null)}>
+        {[max, 0, -max].map((t) => (
+          <g key={t}>
+            <line x1={m.l} x2={W - m.r} y1={y(t)} y2={y(t)} stroke={t === 0 ? "var(--line-strong)" : "var(--line)"} strokeWidth={1} />
+            <text x={m.l - 6} y={y(t) + 3.5} textAnchor="end" fontSize={10.5} fill="var(--muted)" className="tabular">
+              {fmt.signedPct(t, 0)}
+            </text>
+          </g>
+        ))}
+        {points.map((p, i) => {
+          const cx = m.l + step * (i + 0.5);
+          const v = p.value == null ? null : Math.max(-max, Math.min(max, p.value));
+          return (
+            <g key={p.month} onMouseEnter={() => setHover(i)}>
+              <rect x={cx - step / 2} width={step} y={m.t} height={H - m.t - m.b} fill="transparent" />
+              {v != null && (
+                <rect
+                  x={cx - bw / 2}
+                  width={bw}
+                  y={Math.min(y(v), y(0))}
+                  height={Math.max(1, Math.abs(y(v) - y(0)))}
+                  rx={2}
+                  fill={v >= 0 ? "var(--accent)" : "var(--critical)"}
+                  opacity={hover == null || hover === i ? 0.9 : 0.45}
+                />
+              )}
+              {(i === points.length - 1 || (i % labelEvery === 0 && points.length - 1 - i >= Math.ceil(labelEvery * 0.6))) && (
+                <text x={cx} y={H - 8} textAnchor={i === points.length - 1 ? "end" : "middle"} fontSize={10.5} fill="var(--muted)">
+                  {monthLabel(p.month)}
+                </text>
+              )}
+            </g>
+          );
+        })}
+      </svg>
+      {hover != null && (
+        <div
+          className="pointer-events-none absolute top-1 z-10 rounded-lg border border-line bg-surface px-2.5 py-1.5 text-[12px] shadow"
+          style={{ left: `${((m.l + step * (hover + 0.5)) / W) * 100}%`, transform: hover > points.length / 2 ? "translateX(-105%)" : "translateX(8px)" }}
+        >
+          <div className="font-semibold text-ink">{monthLabel(points[hover].month, "long")}</div>
+          <div className="tabular text-ink-2">
+            {label}: <span className="font-semibold text-ink">{points[hover].value == null ? "no year-earlier month" : fmt.signedPct(points[hover].value, 1)}</span>
+          </div>
+        </div>
+      )}
+    </div>
   );
 }

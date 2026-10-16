@@ -45,7 +45,7 @@ export default function ShelfSettings() {
       <Card
         title={shelf.name}
         subtitle={`${countiesByFips[shelf.county_fips]?.name} County (set by your network manager)`}
-        actions={shelf.is_demo ? <Badge tone="demo">Demo shelf</Badge> : undefined}
+        actions={shelf.is_demo ? <Badge tone="demo">County network</Badge> : undefined}
       >
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
           <Field label="Shelf name">

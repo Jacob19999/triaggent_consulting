@@ -1,14 +1,14 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useCallback, useMemo, type ReactNode } from "react";
+import { useCallback, useMemo, type CSSProperties, type ReactNode } from "react";
 import { fmt } from "@/lib/format";
 import { makeScale, type RampId } from "@/lib/ramps";
 import { countiesByFips, research } from "@/lib/research";
 import type { GeoJSONGeometry } from "@/lib/types";
 import { useTheme } from "../theme";
-import { Card } from "../ui";
-import { GeoMap, LegendBar } from "./GeoMap";
+import { Card, cx, type Info } from "../ui";
+import { GeoMap, LegendBar, type MapMarker } from "./GeoMap";
 
 /** A card with a basemap choropleth: counties by default, or any units passed as `geometry`. */
 export function CountyMapCard({
@@ -30,6 +30,8 @@ export function CountyMapCard({
   unitName,
   extra,
   note,
+  markers,
+  info,
   height = 470,
   className,
 }: {
@@ -51,7 +53,10 @@ export function CountyMapCard({
   unitName?: (id: string) => string;
   extra?: (id: string) => ReactNode;
   note?: ReactNode;
-  height?: number;
+  /** Point overlays at county centroids (counts, never site locations; D-021). */
+  markers?: MapMarker[];
+  info?: Info;
+  height?: CSSProperties["height"];
   className?: string;
 }) {
   const theme = useTheme();
@@ -74,36 +79,39 @@ export function CountyMapCard({
   );
   const name = (id: string) => unitName?.(id) ?? `${countiesByFips[id]?.name ?? id} County`;
   return (
-    <Card title={title} subtitle={subtitle} actions={actions} icon="map" padded={false} className={className}>
-      <div className="relative overflow-hidden border-t border-line" style={{ height }}>
-        <GeoMap
-          geometry={geometry ?? research.geometry}
-          fill={fill}
-          selected={selected}
-          onSelect={(id) => (onSelect ? onSelect(id) : href ? router.push(href(id)) : undefined)}
-          outlines={geometry ? research.geometry : undefined}
-          dashed={dashed}
-          basemap={theme === "dark" ? "dark" : "light"}
-          ariaLabel={`Minnesota map: ${typeof legendTitle === "string" ? legendTitle : "index"}`}
-          fitPadding={[12, 52, 12, 12]}
-          hoverCard={(id) => {
-            const v = values[id];
-            return (
-              <div>
-                <div className="font-semibold text-ink">{name(id)}</div>
-                <div className="mt-1 flex justify-between gap-4 text-ink-2">
-                  <span>{legendTitle}</span>
-                  <span className="tabular font-semibold text-ink">{v == null ? "no data" : format(v)}</span>
+    <Card title={title} subtitle={subtitle} actions={actions} info={info} icon="map" padded={false} className={cx("flex flex-col", className)}>
+      <div className="relative flex-1 overflow-hidden border-t border-line" style={{ minHeight: height }}>
+        <div className="absolute inset-0">
+          <GeoMap
+            geometry={geometry ?? research.geometry}
+            fill={fill}
+            selected={selected}
+            onSelect={(id) => (onSelect ? onSelect(id) : href ? router.push(href(id)) : undefined)}
+            outlines={geometry ? research.geometry : undefined}
+            dashed={dashed}
+            markers={markers}
+            basemap={theme === "dark" ? "dark" : "light"}
+            ariaLabel={`Minnesota map: ${typeof legendTitle === "string" ? legendTitle : "index"}`}
+            fitPadding={[12, 52, 12, 12]}
+            hoverCard={(id) => {
+              const v = values[id];
+              return (
+                <div>
+                  <div className="font-semibold text-ink">{name(id)}</div>
+                  <div className="mt-1 flex justify-between gap-4 text-ink-2">
+                    <span>{legendTitle}</span>
+                    <span className="tabular font-semibold text-ink">{v == null ? "no data" : format(v)}</span>
                 </div>
                 {extra?.(id)}
               </div>
             );
           }}
         />
+        </div>
       </div>
-      <div className="flex flex-wrap items-center justify-between gap-x-6 gap-y-2 rounded-b-[var(--radius-card)] border-t border-line px-4 py-3 sm:px-5">
-        <LegendBar title={legendTitle} scale={scale} format={format} low={low} high={high} />
-        {note && <span className="max-w-[460px] text-[11.5px] leading-snug text-muted">{note}</span>}
+      <div className="flex shrink-0 flex-wrap items-center gap-x-8 gap-y-4 rounded-b-[var(--radius-card)] border-t border-line bg-surface-2/40 px-4 py-4 sm:px-5">
+        <LegendBar title={legendTitle} scale={scale} format={format} low={low} high={high} className="flex-1" />
+        {note && <div className="max-w-[440px] text-[11.5px] leading-relaxed text-muted">{note}</div>}
       </div>
     </Card>
   );

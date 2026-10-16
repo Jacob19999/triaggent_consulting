@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { AgentPanel } from "@/components/AgentPanel";
+import { CountyAlertSelect } from "@/components/CountyAlertSelect";
 import { Card, Field, Input, PageHeader, Select, SourceNote } from "@/components/ui";
 import { research } from "@/lib/research";
 
@@ -41,15 +42,7 @@ export default function BriefingPage() {
                 <option value="ask">Ask a question</option>
               </Select>
             </Field>
-            {mode === "county" && (
-              <Field label="County">
-                <Select value={county} onChange={(e) => setCounty(e.target.value)}>
-                  {research.counties.map((c) => (
-                    <option key={c.fips}>{c.name}</option>
-                  ))}
-                </Select>
-              </Field>
-            )}
+            {mode === "county" && <CountyAlertSelect value={county} onChange={setCounty} />}
             {mode === "ask" && (
               <>
                 <Field label="Question">

@@ -14,18 +14,28 @@ export interface GeminiContent {
   parts: GeminiPart[];
 }
 
+export type GeminiTool =
+  | { functionDeclarations: { name: string; description: string; parametersJsonSchema: unknown }[] }
+  // Google Search grounding: the model runs its own web queries server-side at Google.
+  | { googleSearch: Record<string, never> };
+
 export interface GeminiRequest {
   systemInstruction: { parts: { text: string }[] };
   contents: GeminiContent[];
-  tools: { functionDeclarations: { name: string; description: string; parametersJsonSchema: unknown }[] }[];
-  toolConfig: { functionCallingConfig: { mode: "ANY" | "AUTO" } };
+  tools: GeminiTool[];
+  toolConfig?: { functionCallingConfig: { mode: "ANY" | "AUTO" } };
   generationConfig: { maxOutputTokens: number; temperature: number };
+}
+
+export interface GroundingMetadata {
+  webSearchQueries?: string[];
+  groundingChunks?: { web?: { uri?: string; title?: string } }[];
 }
 
 export interface GeminiResponse {
   modelVersion?: string;
   promptFeedback?: { blockReason?: string };
-  candidates?: { content?: GeminiContent; finishReason?: string }[];
+  candidates?: { content?: GeminiContent; finishReason?: string; groundingMetadata?: GroundingMetadata }[];
 }
 
 export type GenerateContent = (params: GeminiRequest) => Promise<GeminiResponse>;

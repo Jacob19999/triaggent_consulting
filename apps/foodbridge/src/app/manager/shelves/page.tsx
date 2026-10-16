@@ -148,15 +148,15 @@ function LiveDemoControls() {
   if (session.mode !== "live" || !store.importDemo) return null;
   const hasDemo = data.shelves.some((s) => s.is_demo);
   return (
-    <Card className="mb-4" title="Demo shelves in the live workspace" subtitle="Loads the same labelled synthetic network as the demo workspace, for training or a presentation. Remove it before real shelves report.">
+    <Card className="mb-4" title="County networks in the live workspace" subtitle="Loads the 86 county networks (statewide extract, county totals by month) as labelled records, for training or a presentation. Remove them before real shelves report.">
       <div className="flex flex-wrap items-center gap-2">
         {!hasDemo ? (
-          <Button variant="secondary" onClick={async () => { setMsg(`Loaded ${await store.importDemo!()} demo shelves.`); await refresh(); }}>
-            Load demo shelves
+          <Button variant="secondary" onClick={async () => { setMsg(`Loaded ${await store.importDemo!()} county networks.`); await refresh(); }}>
+            Load county networks
           </Button>
         ) : (
-          <Button variant="danger" onClick={async () => { setMsg(`Removed ${await store.removeDemo!()} demo shelves and their reports.`); await refresh(); }}>
-            Remove demo shelves
+          <Button variant="danger" onClick={async () => { setMsg(`Removed ${await store.removeDemo!()} county networks and their reports.`); await refresh(); }}>
+            Remove county networks
           </Button>
         )}
         {msg && <span className="text-[13px] text-ink-2">{msg}</span>}

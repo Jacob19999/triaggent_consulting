@@ -19,9 +19,22 @@ npm install
 npm run dev            # http://localhost:3000
 ```
 
-With no environment variables the **demo workspace** works end to end: 14 synthetic
-"Demo shelf" records live in the browser (scaled from county averages, not site data).
-Copy `.env.example` to `.env.local` to enable the live workspace and the AI agent.
+**Portal password.** Every page, API route, `/data` file, deck PDF and app chunk sits
+behind one password (`FOODBRIDGE_PORTAL_PASSWORD`, checked in `src/middleware.ts`; the
+form is the plain-HTML `/gate` route). The browser keeps an HttpOnly cookie holding a
+SHA-256 of the password for 7 days; **Lock portal** in the sidebar clears it, and changing
+the password signs everyone out. If the variable is unset the portal refuses every request
+(503), so a deployment never opens by accident. Set it in `.env.local` before `npm run dev`.
+
+Without Supabase the **county networks workspace** works end to end: 86 records, one per
+county with a reporting shelf ("Aitkin County network"), each month the sum over that
+county's reporting sites in the statewide extract (`food_shelf_broad`, the repaired Q7
+training panel, January 2022 to July 2026). They are real sponsor aggregates at county
+grain, not individual shelves: the extract carries no shelf names, and the hosted rules
+forbid site rows. Stock, receipts, capacity, turn-aways and volunteer hours are not in the
+extract and stay blank, so stock and capacity alerts cannot fire on them. Each network's
+1:2:3 run rate reproduces the submitted county forecast (a test checks this). Copy
+`.env.example` to `.env.local` to enable the live workspace and the AI agent.
 
 For temporary prototype access, set `FOODBRIDGE_EMAIL_ONLY_LOGIN=true` in
 `.env.local` or the deployment environment. Entering an email at `/login` creates the
@@ -41,12 +54,19 @@ npm run build
 
 ## Refresh the research data
 
-The app reads `data/research.json` and `public/data/fei-tracts.json`. Both are generated,
-committed, and contain county and tract aggregates only. Rebuild from the repository root:
+The app reads `data/research.json`, `public/data/fei-tracts.json` and
+`public/data/networks.json`. All are generated, committed, and contain county and tract
+aggregates only. Rebuild from the repository root:
 
 ```bash
+uv run python -m mi.county_networks   # outputs/tables/county_network_month.csv
 uv run python -m mi.foodbridge_bundle
 ```
+
+When this checkout lacks the FEI tables, a full rebuild would mark FEI pending. Refresh
+only the county networks (and their row in the source list) with
+`uv run python -m mi.foodbridge_bundle --networks-only`. A new network table changes its
+SHA-256, which starts browsers on a fresh copy instead of their saved one.
 
 Options: `--geo <map_payload.json>` (county and tract outlines; built by `make geo`),
 `--sram <sram2025_mn.csv>` (tract urban flags), and `--fei-tables <dir> --fei-meta <dir>`
@@ -71,6 +91,7 @@ the Q6 need percentile, labelled as a placeholder (FoodBridge never computes its
 
    | Variable | Needed for | Exposed to browser |
    | --- | --- | --- |
+   | `FOODBRIDGE_PORTAL_PASSWORD` | **Required.** Portal password; unset = every request refused | no |
    | `NEXT_PUBLIC_SUPABASE_URL` | Live workspace | yes (public) |
    | `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | Live workspace (RLS applies) | yes (public) |
    | `SUPABASE_SECRET_KEY` | Granting shelf access (`/api/admin/invite`) | **no, server only** |
@@ -82,10 +103,11 @@ the Q6 need percentile, labelled as a placeholder (FoodBridge never computes its
    | `NEXT_PUBLIC_FOODBRIDGE_MODE` | Optional `demo`: hide the live workspace | yes |
    | `FOODBRIDGE_ALLOW_INDEXING` | Optional `true`: allow search indexing (off by default) | no |
 
-4. Deploy. `/api/health` reports the bundle version, AI provider/model, and which services are configured. Gemini uses the direct Google `generateContent` API with read-only function calls. When the default Flash alias returns HTTP 503, the conversation restarts once on `gemini-flash-lite-latest`, and the summary identifies the fallback model; quota, overload, timeout, or missing-key failures return the sourced offline briefing. Free-tier quotas are controlled by Google and are not guaranteed by this app. Keep `GEMINI_API_KEY` server-only (a Vercel Secret), never in a `NEXT_PUBLIC_` variable.
+4. Deploy. `/api/health` reports the bundle version, AI provider/model, and which services are configured. Gemini uses the direct Google `generateContent` API with read-only function calls. When the default Flash alias returns HTTP 503, the conversation restarts once on Gemini 3.5 Flash Lite (`gemini-3.5-flash-lite`), and the summary identifies the fallback model; quota, overload, timeout, or missing-key failures return the sourced offline briefing. Free-tier quotas are controlled by Google and are not guaranteed by this app. Keep `GEMINI_API_KEY` server-only (a Vercel Secret), never in a `NEXT_PUBLIC_` variable.
 
-Deploying is publishing (CLAUDE.md): the URL is public unless you turn on Vercel
-Deployment Protection. Pages send `noindex` by default.
+Deploying is publishing (CLAUDE.md). The portal password keeps casual visitors and
+crawlers out; it is not access control for sensitive data, so the bundle still carries
+county and tract aggregates only. Pages send `noindex` by default.
 
 ## Set up Supabase (live workspace)
 
@@ -102,10 +124,11 @@ Deployment Protection. Pages send `noindex` by default.
 4. Manager → **Shelves & priorities** → Add a shelf → **Give a shelf coordinator access**
    (creates the account server-side and links it to the shelf). The coordinator signs in
    at `/login` with that email.
-5. Optional: **Load demo shelves** on the same page copies the labelled synthetic network
-   into the live workspace for training or a presentation; **Remove demo shelves** deletes it.
+5. Optional: **Load county networks** on the same page copies the 86 labelled county
+   networks into the live workspace for training or a presentation; **Remove county
+   networks** deletes them (rows flagged `is_demo`).
 6. Verify the schema against the app's real payloads (reads `.env.local`; inserts one labelled
-   shelf with its reports, checks constraints and row-level security, then deletes it):
+   county network with its reports, checks constraints and row-level security, then deletes it):
 
    ```bash
    SUPABASE_INTEGRATION=1 npx vitest run tests/supabase.integration.test.ts
@@ -169,7 +192,8 @@ Meal Gap tables never go there.
 
 Distances are straight lines to reporting shelves only; non-reporting shelves, meal programs
 and grocers are not in the network. FEI is a screening index, not a count of unmet people and
-not causal. The research snapshot ends July 2026. Demo shelves are synthetic.
+not causal. The research snapshot ends July 2026. County networks are county totals, not
+shelves; a county with one reporting site still shows that site's monthly totals.
 
 Maps draw on Esri basemap tiles (Dark/Light Gray Canvas, Streets, Imagery) from
 `server.arcgisonline.com`, allowed in the CSP `img-src`. CARTO's free tiles now return an

@@ -148,7 +148,7 @@ export default function Home() {
         <div className="mt-8 grid grid-cols-1 gap-4 md:grid-cols-2">
           <div className="rounded-[var(--radius-card)] border border-line bg-surface p-5 text-[13.5px] leading-relaxed text-ink-2">
             <h2 className="flex items-center gap-2 text-[15px] font-semibold text-ink">
-              <Icon name="info" className="h-4 w-4 text-accent" /> What is real and what is demo
+              <Icon name="info" className="h-4 w-4 text-accent" /> What the numbers are
             </h2>
             <ul className="mt-2 list-disc space-y-1 pl-5">
               <li>
@@ -161,8 +161,9 @@ export default function Home() {
                   : "The Food Access Equity Index is being built (task A4); until it lands, maps show the Q6 need screen, labelled as a placeholder."}
               </li>
               <li>
-                Shelves in the demo workspace are synthetic (&ldquo;Demo shelf&rdquo;), scaled from county averages. They are not The Food
-                Group&apos;s site data.
+                Each &ldquo;County network&rdquo; is that county&apos;s reporting food shelves summed by month (HouseholdsReg,
+                IndividualsReg, age split, PoundsReg) from the statewide extract. No individual shelf is shown; a county with one
+                reporting site still reflects that site&apos;s totals.
               </li>
             </ul>
           </div>
@@ -179,7 +180,7 @@ export default function Home() {
                 Sign in <Icon name="arrow" className="h-4 w-4" />
               </button>
             ) : (
-              <p className="mt-3 text-muted">Not configured on this deployment. The demo works without it.</p>
+              <p className="mt-3 text-muted">Not configured on this deployment. The county networks work without it.</p>
             )}
           </div>
         </div>

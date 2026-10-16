@@ -7,7 +7,7 @@ import { research } from "@/lib/research";
 const FORBIDDEN = [/"site_key"/, /"block_geoid"/, /INTPT/i, /"fi_rate"/, /"fi_persons"/, /"cost_per_meal"/, /"child_fi_rate"/, /"sites_in_tract"/, /\/Users\//];
 
 describe("research bundle", () => {
-  const files = ["../data/research.json", "../public/data/fei-tracts.json"].map((f) => readFileSync(path.join(__dirname, f), "utf8"));
+  const files = ["../data/research.json", "../public/data/fei-tracts.json", "../public/data/networks.json"].map((f) => readFileSync(path.join(__dirname, f), "utf8"));
   it("contains no forbidden field or local path", () => {
     for (const text of files) for (const re of FORBIDDEN) expect(re.test(text), String(re)).toBe(false);
   });

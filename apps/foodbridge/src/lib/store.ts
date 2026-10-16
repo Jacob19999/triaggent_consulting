@@ -1,10 +1,10 @@
 "use client";
 // Two interchangeable backends behind one interface:
-//  - DemoStore: seeded synthetic network in this browser's storage (no login).
+//  - DemoStore: the real county networks (statewide extract, county grain) seeded into
+//    this browser's storage (no login).
 //  - SupabaseStore: shared Postgres with row-level security (sign-in required).
 
-import { buildDemoData } from "./demo";
-import { demoInsertRows } from "./demoRows";
+import { fetchNetworkData, networkInsertRows, NETWORKS_SHA } from "./networks";
 import { browserSupabase } from "./supabase/client";
 import type {
   AlertState,
@@ -38,30 +38,46 @@ export interface Store {
   saveScenario(input: Omit<SavedScenario, "id" | "created_at">): Promise<void>;
   deleteScenario(id: string): Promise<void>;
   reset?(): Promise<void>;
-  /** Live only: copy the labelled synthetic demo network in, or remove it again. */
+  /** Live only: copy the labelled county networks in, or remove them again. */
   importDemo?(): Promise<number>;
   removeDemo?(): Promise<number>;
 }
 
-const KEY = "foodbridge.demo.v1";
+// A new network table (different SHA) or seed rule (SEED) starts a fresh copy instead of
+// serving stale totals or an old request inbox.
+const SEED = "s2";
+const PREFIX = "foodbridge.networks.";
+const KEY = `${PREFIX}${SEED}.${NETWORKS_SHA.slice(0, 12)}`;
+const LEGACY_KEYS = ["foodbridge.demo.v1"];
+const isStale = (k: string) => LEGACY_KEYS.includes(k) || (k.startsWith(PREFIX) && k !== KEY);
 const now = () => new Date().toISOString();
 const uid = () =>
   typeof crypto !== "undefined" && "randomUUID" in crypto
     ? crypto.randomUUID()
     : `${Date.now()}-${Math.random().toString(36).slice(2)}`;
 
-function seed(): Snapshot {
-  const d = buildDemoData();
+async function seed(): Promise<Snapshot> {
+  const d = await fetchNetworkData();
   return { ...d, alertStates: [], scenarios: [] };
 }
 
 export class DemoStore implements Store {
   kind = "demo" as const;
   private memory: Snapshot | null = null;
+  private pending: Promise<Snapshot> | null = null;
 
-  private read(): Snapshot {
-    if (this.memory) return this.memory;
+  private read(): Promise<Snapshot> {
+    if (this.memory) return Promise.resolve(this.memory);
+    // One seed per page even when several callers race on first load.
+    this.pending ??= this.restore().finally(() => {
+      this.pending = null;
+    });
+    return this.pending;
+  }
+
+  private async restore(): Promise<Snapshot> {
     try {
+      Object.keys(window.localStorage).filter(isStale).forEach((k) => window.localStorage.removeItem(k));
       const raw = window.localStorage.getItem(KEY);
       if (raw) {
         this.memory = JSON.parse(raw) as Snapshot;
@@ -70,7 +86,7 @@ export class DemoStore implements Store {
     } catch {
       // Private mode or blocked storage: fall back to memory only.
     }
-    this.memory = seed();
+    this.memory = await seed();
     this.write();
     return this.memory;
   }
@@ -84,25 +100,25 @@ export class DemoStore implements Store {
   }
 
   async load() {
-    return structuredClone(this.read());
+    return structuredClone(await this.read());
   }
 
   async saveShelf(input: ShelfInput) {
-    const s = this.read();
+    const s = await this.read();
     const existing = input.id ? s.shelves.find((x) => x.id === input.id) : undefined;
     if (existing) Object.assign(existing, input);
-    else s.shelves.push({ ...input, id: input.id ?? uid(), is_demo: true, created_at: now() } as Shelf);
+    else s.shelves.push({ ...input, id: input.id ?? uid(), is_demo: false, created_at: now() } as Shelf);
     this.write();
   }
 
   async saveReport(input: ReportInput) {
-    const s = this.read();
+    const s = await this.read();
     const i = s.reports.findIndex((r) => r.shelf_id === input.shelf_id && r.month === input.month);
     const row: ShelfReport = {
       ...input,
       id: i >= 0 ? s.reports[i].id : uid(),
       submitted_at: now(),
-      submitted_by: "demo user",
+      submitted_by: "local user",
     };
     if (i >= 0) s.reports[i] = row;
     else s.reports.push(row);
@@ -110,20 +126,20 @@ export class DemoStore implements Store {
   }
 
   async createRequest(input: RequestInput) {
-    const s = this.read();
+    const s = await this.read();
     s.requests.unshift({ ...input, id: uid(), status: "open", response: null, created_at: now(), updated_at: now() });
     this.write();
   }
 
   async updateRequest(id: string, patch: Partial<Pick<ShelfRequest, "status" | "response">>) {
-    const s = this.read();
+    const s = await this.read();
     const r = s.requests.find((x) => x.id === id);
     if (r) Object.assign(r, patch, { updated_at: now() });
     this.write();
   }
 
   async setAlertState(key: string, status: AlertStatus, note: string | null) {
-    const s = this.read();
+    const s = await this.read();
     const row = s.alertStates.find((a) => a.alert_key === key);
     if (row) Object.assign(row, { status, note, updated_at: now() });
     else s.alertStates.push({ alert_key: key, status, note, updated_at: now() });
@@ -131,19 +147,19 @@ export class DemoStore implements Store {
   }
 
   async saveScenario(input: Omit<SavedScenario, "id" | "created_at">) {
-    const s = this.read();
+    const s = await this.read();
     s.scenarios.unshift({ ...input, id: uid(), created_at: now() });
     this.write();
   }
 
   async deleteScenario(id: string) {
-    const s = this.read();
+    const s = await this.read();
     s.scenarios = s.scenarios.filter((x) => x.id !== id);
     this.write();
   }
 
   async reset() {
-    this.memory = seed();
+    this.memory = await seed();
     this.write();
   }
 }
@@ -227,10 +243,9 @@ export class SupabaseStore implements Store {
   }
 
   async importDemo(): Promise<number> {
-    const { shelves, reports, requests } = demoInsertRows(uid);
+    const { shelves, reports } = networkInsertRows(await fetchNetworkData(), uid);
     check(await this.db.from("shelves").insert(shelves));
     for (let i = 0; i < reports.length; i += 500) check(await this.db.from("shelf_reports").insert(reports.slice(i, i + 500)));
-    if (requests.length) check(await this.db.from("shelf_requests").insert(requests));
     return shelves.length;
   }
 

@@ -57,7 +57,7 @@ const SECTIONS = [
   },
   {
     title: "Stack and deployment",
-    body: "Next.js 15 (App Router, TypeScript) on Vercel; Supabase Postgres + Auth with row-level security; Google Gemini API for the agent (server only). Demo mode needs no services: synthetic shelves live in the browser. Security headers (CSP, nosniff, frame-ancestors), noindex by default, per-IP and daily limits on the agent route.",
+    body: "Next.js 15 (App Router, TypeScript) on Vercel; Supabase Postgres + Auth with row-level security; Google Gemini API for the agent (server only). Without Supabase the app runs on the county networks (statewide extract, county totals by month) kept in the browser. The whole site sits behind a portal password checked in middleware. Security headers (CSP, nosniff, frame-ancestors), noindex by default, per-IP and daily limits on the agent route.",
   },
 ];
 

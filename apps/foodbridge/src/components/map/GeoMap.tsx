@@ -114,20 +114,24 @@ export function LegendBar({
   className?: string;
 }) {
   return (
-    <div className={cx("flex min-w-0 flex-wrap items-center gap-x-4 gap-y-1.5", className)}>
-      <span className="whitespace-nowrap text-[11px] font-semibold uppercase tracking-[0.08em] text-muted">{title}</span>
-      <span className="flex min-w-[220px] flex-1 items-center gap-2 sm:max-w-[380px]">
-        {low && <span className="whitespace-nowrap text-[10.5px] text-muted">{low}</span>}
-        <span className="min-w-0 flex-1">
-          <span className="block h-2 rounded-full" style={{ background: gradientCss(scale.stops) }} />
-          <span className="tabular mt-0.5 flex justify-between text-[10px] text-ink-2">
-            {scale.ticks.map((t, i) => (
-              <span key={i}>{format(t)}</span>
-            ))}
-          </span>
+    <div className={cx("min-w-[min(100%,260px)] max-w-[420px]", className)}>
+      <div className="mb-2 flex items-center justify-between gap-3">
+        <span className="text-[11px] font-semibold uppercase tracking-[0.08em] text-ink-2">{title}</span>
+        <span className="inline-flex shrink-0 items-center gap-1.5 text-[10.5px] text-muted">
+          <span className="h-2.5 w-3 rounded-sm bg-[var(--nodata)] ring-1 ring-line" /> No data
         </span>
-        {high && <span className="whitespace-nowrap text-[10.5px] text-muted">{high}</span>}
-      </span>
+      </div>
+      <div className="h-2.5 rounded-sm ring-1 ring-inset ring-black/10" style={{ background: gradientCss(scale.stops) }} />
+      <div className="tabular relative mt-1 h-4 text-[10.5px] text-ink-2">
+        {scale.ticks.map((t, i) => (
+          <span key={i} className="absolute" style={{ left: `${(i / (scale.ticks.length - 1)) * 100}%`, transform: `translateX(${i === 0 ? "0" : i === scale.ticks.length - 1 ? "-100%" : "-50%"})` }}>{format(t)}</span>
+        ))}
+      </div>
+      {(low || high) && (
+        <div className="mt-1 flex justify-between gap-3 text-[10.5px] text-muted">
+          <span>{low}</span><span className="text-right">{high}</span>
+        </div>
+      )}
       {note && <span className="text-[11px] leading-snug text-muted">{note}</span>}
     </div>
   );

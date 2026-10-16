@@ -40,6 +40,15 @@ for (const dir of targets) {
         failed = true;
       }
     }
+    if (name === "sites.json") {
+      // D-063: site points carry location, type and precision only, never activity or identity.
+      const b = JSON.parse(text);
+      const rows = Object.values(b.counties).flat();
+      if (b.meta.fields.join() !== "lon,lat,type,approx" || rows.some((r) => r.length !== 4 || r.some((v) => typeof v !== "number"))) {
+        console.error("FAIL sites.json: rows must be [lon, lat, type, approx] numbers only");
+        failed = true;
+      }
+    }
     if (name === "research.json") {
       const b = JSON.parse(text);
       const late = b.history.filter((h) => h.month >= b.meta.forecast_target);

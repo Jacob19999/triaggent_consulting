@@ -26,7 +26,7 @@ export default function ShelfHome() {
   if (!shelf || !outlook)
     return (
       <Empty title={session.mode === "live" ? "Your account is not linked to a shelf yet." : "No shelf selected."}>
-        {session.mode === "live" ? "Ask your network manager to grant access to your shelf." : "Pick a demo shelf in the top bar."}
+        {session.mode === "live" ? "Ask your network manager to grant access to your shelf." : "Pick a county network in the top bar."}
       </Empty>
     );
   const county = countiesByFips[shelf.county_fips];
@@ -40,12 +40,12 @@ export default function ShelfHome() {
   return (
     <>
       <PageHeader
-        eyebrow={`${county?.name} County · ${shelf.type.replaceAll("_", " ")}`}
+        eyebrow={`${county?.name} County · ${shelf.is_demo ? (latest?.notes?.split(".")[0] ?? "all reporting sites") : shelf.type.replaceAll("_", " ")}`}
         title={shelf.name}
         description={shelf.hours ? `Hours: ${shelf.hours}` : undefined}
         actions={
           <>
-            {shelf.is_demo && <Badge tone="demo">Synthetic demo shelf</Badge>}
+            {shelf.is_demo && <Badge tone="demo">County network · statewide extract</Badge>}
             <Link href="/shelf/report" className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-accent bg-accent px-3.5 text-[13.5px] font-medium text-[var(--accent-ink)] hover:bg-[var(--accent-hover)]">
               <Icon name="form" /> {missing ? `Submit ${monthLabel(asOf)} report` : "Update a report"}
             </Link>

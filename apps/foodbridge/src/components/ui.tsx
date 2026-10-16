@@ -1,11 +1,14 @@
 import type { ButtonHTMLAttributes, InputHTMLAttributes, ReactNode, SelectHTMLAttributes } from "react";
 import type { Severity } from "@/lib/alerts";
+import { InfoTip, type Info } from "./InfoTip";
+
+export type { Info };
 
 export function cx(...parts: (string | false | null | undefined)[]) {
   return parts.filter(Boolean).join(" ");
 }
 
-const PATHS: Record<string, string> = {
+export const PATHS: Record<string, string> = {
   dashboard: "M3 13h8V3H3v10zm0 8h8v-6H3v6zm10 0h8V11h-8v10zm0-18v6h8V3h-8z",
   index: "M4 19V9m5 10V5m5 14v-7m5 7V3",
   map: "M9 4 3 6v14l6-2 6 2 6-2V4l-6 2-6-2zm0 0v14m6-12v14",
@@ -85,6 +88,7 @@ export function Card({
   subtitle,
   actions,
   icon,
+  info,
   padded = true,
 }: {
   children: ReactNode;
@@ -93,6 +97,8 @@ export function Card({
   subtitle?: ReactNode;
   actions?: ReactNode;
   icon?: string;
+  /** Click-to-open explanation: what the panel shows, how it is calculated, source. */
+  info?: Info;
   padded?: boolean;
 }) {
   return (
@@ -112,7 +118,12 @@ export function Card({
               </span>
             )}
             <div className="min-w-0">
-              {title && <h2 className="text-[14.5px] font-semibold tracking-[-0.01em] text-ink">{title}</h2>}
+              {title && (
+                <h2 className="flex items-center gap-1.5 text-[14.5px] font-semibold tracking-[-0.01em] text-ink">
+                  {title}
+                  {info && <InfoTip info={info} label={`About ${typeof title === "string" ? title : "this panel"}`} />}
+                </h2>
+              )}
               {subtitle && <p className="mt-0.5 text-[12.5px] leading-snug text-muted">{subtitle}</p>}
             </div>
           </div>
@@ -131,6 +142,7 @@ export function Stat({
   tone,
   icon,
   accent,
+  info,
 }: {
   label: ReactNode;
   value: ReactNode;
@@ -138,16 +150,20 @@ export function Stat({
   tone?: "default" | "forecast";
   icon?: string;
   accent?: string;
+  info?: Info;
 }) {
   return (
     <div className="relative min-w-0 overflow-hidden rounded-[var(--radius-card)] border border-line bg-surface p-4 shadow-[var(--shadow)]">
       <span className="absolute inset-y-0 left-0 w-[3px]" style={{ background: accent ?? "var(--accent)" }} aria-hidden />
-      <div className="flex items-center justify-between gap-2">
-        <div className="flex min-w-0 items-center gap-2 text-[11.5px] font-semibold uppercase tracking-[0.06em] text-muted">
-          <span className="truncate">{label}</span>
+      <div className="flex items-start justify-between gap-2">
+        <div className="flex min-w-0 flex-wrap items-center gap-x-1.5 gap-y-1 text-[11.5px] font-semibold uppercase leading-tight tracking-[0.06em] text-muted">
+          <span className="min-w-0 break-words">{label}</span>
           {tone === "forecast" && <ForecastBadge />}
         </div>
-        {icon && <Icon name={icon} className="h-4 w-4 shrink-0 text-muted" />}
+        <span className="flex shrink-0 items-center gap-1.5">
+          {info && <InfoTip info={info} label={`About ${typeof label === "string" ? label : "this figure"}`} />}
+          {icon && <Icon name={icon} className="h-4 w-4 text-muted" />}
+        </span>
       </div>
       <div className="mt-2 text-[26px] font-semibold leading-none tracking-[-0.02em] text-ink">{value}</div>
       {sub && <div className="mt-2 text-[12.5px] leading-snug text-ink-2">{sub}</div>}

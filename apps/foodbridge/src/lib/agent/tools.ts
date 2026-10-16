@@ -276,7 +276,7 @@ export function runTool(name: string, input: Record<string, unknown>, snap: Snap
       const where = typeof input.where === "string" ? input.where.toLowerCase() : null;
       return {
         workspace: snap.workspace,
-        note: snap.workspace === "demo" ? "Demo workspace: shelves are synthetic, scaled from county aggregates." : undefined,
+        note: snap.workspace === "demo" ? "County networks workspace: each shelf is one county's reporting sites summed by month from the statewide extract; stock, capacity and turn-aways are not in the extract." : undefined,
         alerts: snap.alerts.filter(
           (a) =>
             (!input.scope || a.scope === input.scope) &&

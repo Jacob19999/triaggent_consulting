@@ -1,5 +1,5 @@
 // Shapes of the research bundle written by `uv run python -m mi.foodbridge_bundle`
-// and of the operational records the app stores (Supabase or demo storage).
+// and of the operational records the app stores (Supabase or this browser's county networks copy).
 
 export type Signal = "HouseholdsTotal" | "PoundsTotal" | "IndividualsTotal";
 export type AgeSignal = "ChildrenTotal" | "AdultsTotal" | "SeniorsTotal";
@@ -102,6 +102,10 @@ export interface FeiTract {
   d?: number | null;
   d_bm?: number | null;
   beyond?: number | null;
+  /** Driving miles / minutes to the nearest reporting shelf and share beyond θ by road (OSRM). */
+  d_road?: number | null;
+  min_road?: number | null;
+  beyond_road?: number | null;
   urban?: number | null;
   theta?: number | null;
   lat?: number | null;
@@ -252,7 +256,7 @@ export interface Shelf {
   hours: string | null;
   contact_name: string | null;
   active: boolean;
-  is_demo: boolean;
+  is_demo: boolean; // seeded county network (removable), not a shelf's own account record
   priority_status: PriorityStatus | null; // manager override
   manager_note: string | null;
   created_at: string;
@@ -293,6 +297,8 @@ export interface ShelfRequest {
   response: string | null;
   created_at: string;
   updated_at: string;
+  /** Seeded example in the county networks workspace, written from real county totals. */
+  hypothetical?: boolean;
 }
 
 export type AlertStatus = "open" | "acknowledged" | "resolved";

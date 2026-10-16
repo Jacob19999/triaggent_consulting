@@ -4,7 +4,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useState, t
 import { computeAlerts, type Alert, type ShelfOutlook } from "@/lib/alerts";
 import { lastFullMonth } from "@/lib/calendar";
 import { liveAvailable } from "@/lib/config";
-import { DEMO_AS_OF } from "@/lib/demo";
+import { NETWORK_AS_OF } from "@/lib/networks";
 import { DemoStore, SupabaseStore, type Snapshot, type Store } from "@/lib/store";
 import { browserSupabase } from "@/lib/supabase/client";
 import type { AlertState, Role } from "@/lib/types";
@@ -74,7 +74,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
   const [error, setError] = useState<string | null>(null);
 
   const store: Store = session.mode === "live" ? liveStore : demoStore;
-  const asOf = session.mode === "live" ? lastFullMonth() : DEMO_AS_OF;
+  const asOf = session.mode === "live" ? lastFullMonth() : NETWORK_AS_OF;
 
   const load = useCallback(async (s: Store) => {
     try {
@@ -120,7 +120,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
             return;
           }
         } catch {
-          // Supabase unreachable: fall through to the demo workspace.
+          // Supabase unreachable: fall through to the county networks workspace.
         }
       }
       const next: Session = {

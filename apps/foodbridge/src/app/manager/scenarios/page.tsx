@@ -7,6 +7,8 @@ import { useData } from "@/components/DataProvider";
 import { GeoMap, LegendBar, type MapMarker } from "@/components/map/GeoMap";
 import { DEFAULT_SETTINGS, LayerList, OverlayControls, StyleControls, type MapSettings, type OverlayState } from "@/components/map/MapControls";
 import { auditGeoms, useLayerFill, useTractRows } from "@/components/map/useMapData";
+import { useDriveReach, useDriveReachMany } from "@/components/useDriveReach";
+import { DRIVE_MINUTES_RING } from "@/lib/drive";
 import { useTheme } from "@/components/theme";
 import {
   Badge,
@@ -208,6 +210,9 @@ export default function SitePlanner() {
 
   const result = evaluation?.result ?? null;
   const fc = evaluation?.forecast ?? null;
+  const drive = useDriveReach(site, tracts.rows);
+  const candidateSites = useMemo(() => candidates.map((c) => ({ lon: c.lon, lat: c.lat })), [candidates]);
+  const candidateDrive = useDriveReachMany(candidateSites, tracts.rows);
   const county = site ? countiesByFips[site.fips] : null;
   const rural = county?.nonmetro ?? true;
 
@@ -335,6 +340,9 @@ export default function SitePlanner() {
           foodValue: result.dollars.foodValue,
           travelSavings: result.dollars.travelSavings,
           netNewValue: result.dollars.netNewValue,
+          driveResidentsCloser: drive.reach?.residentsCloser ?? null,
+          driveMinutesSaved: drive.reach?.avgMinutesSaved ?? null,
+          driveResidentsNewlyWithin: drive.reach?.residentsNewlyWithin ?? null,
         },
       },
     });
@@ -559,6 +567,34 @@ export default function SitePlanner() {
               />
             </Block>
 
+            <Block
+              title="Driving access"
+              icon="route"
+              aside={drive.status === "loading" ? <Badge>routing…</Badge> : drive.status === "ready" ? <Badge tone="green">road network</Badge> : undefined}
+            >
+              {drive.status === "ready" && drive.reach ? (
+                <>
+                  <Line k={`Newly within ${rural ? "10" : "1"} road mile${rural ? "s" : ""}`} v={fmt.int(drive.reach.residentsNewlyWithin)} strong />
+                  <Line k="Residents whose nearest shelf by road gets closer" v={fmt.int(drive.reach.residentsCloser)} />
+                  <Line k="Average drive saved (those residents)" v={`${fmt.num(drive.reach.avgMinutesSaved, 1)} min · ${fmt.num(drive.reach.avgMilesSaved, 1)} mi`} />
+                  <Line k={`Residents within ${DRIVE_MINUTES_RING} minutes' drive`} v={fmt.int(drive.reach.residentsWithin15Min)} />
+                  <SourceNote>
+                    OSRM car routing on OpenStreetMap (© OpenStreetMap contributors, ODbL) from tract centroids, against each
+                    tract&apos;s population-weighted road distance to today&apos;s nearest reporting shelf. Free-flow driving: no
+                    transit, walking or congestion. {fmt.int(drive.reach.tractsRouted)} tracts routed.
+                  </SourceNote>
+                </>
+              ) : drive.status === "loading" ? (
+                <div className="space-y-2" aria-busy="true" aria-label="Routing on the road network">
+                  {[0, 1, 2].map((i) => (
+                    <div key={i} className="h-4 animate-pulse rounded bg-surface-3" />
+                  ))}
+                </div>
+              ) : (
+                <p className="text-[12.5px] text-muted">Road routing is offline right now; the figures above use straight-line miles.</p>
+              )}
+            </Block>
+
             <Block title="Dollar value" icon="dollar" aside={<Badge>per year</Badge>}>
               <ValueBars
                 rows={[
@@ -767,9 +803,10 @@ export default function SitePlanner() {
                   Ranked options
                 </SectionLabel>
                 <ol className="space-y-1.5">
-                  {candidates.map((c) => {
+                  {candidates.map((c, i) => {
                     const r = c.evaluation.result;
                     const isActive = activeRank === c.rank;
+                    const road = candidateDrive[i];
                     return (
                       <li key={c.rank}>
                         <button
@@ -796,6 +833,13 @@ export default function SitePlanner() {
                             <span className="tabular block text-[11px] text-muted">
                               {fmt.int(c.evaluation.forecast.visits)} visits/mo · {fmt.compact(r.residentsNewlyWithin)} newly in reach
                               {r.fei.status === "ready" && ` · FEI −${fmt.num((r.fei.countyBefore ?? 0) - (r.fei.countyAfter ?? 0), 1)}`}
+                            </span>
+                            <span className="tabular block text-[11px] text-muted">
+                              {road === undefined
+                                ? "Routing by road…"
+                                : road
+                                  ? `${fmt.compact(road.residentsCloser)} closer by road · −${fmt.num(road.avgMinutesSaved, 1)} min drive`
+                                  : "Road routing offline"}
                             </span>
                           </span>
                         </button>
@@ -882,7 +926,8 @@ export default function SitePlanner() {
         <div className="px-5 py-4">
           <SourceNote>
             Approximation from tract averages: residents sit at tract centroids; distances are straight lines to the nearest
-            reporting shelf (2024 network, D-051); FEI change applies the FEI build&apos;s published formulas and bounds. Huff
+            reporting shelf (2024 network, validated shelf points, D-064), with driving access loaded separately from the road
+            network; FEI change applies the FEI build&apos;s published formulas and bounds. Huff
             gravity share (exponent {HUFF_EXPONENT}); induced visits from the cross-county distance association, capped at +
             {Math.round((UPLIFT_CAP - 1) * 100)}%, not causal.
           </SourceNote>

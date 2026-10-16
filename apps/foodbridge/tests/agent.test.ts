@@ -31,9 +31,9 @@ describe("Gemini agent loop", () => {
     expect(results.role).toBe("user");
     expect(results.parts.map((p) => p.functionResponse?.id)).toEqual(["t1", "t2"]);
     expect(JSON.stringify(results.parts)).toContain("q7_august2026_wide.csv");
-    expect(calls[0].toolConfig.functionCallingConfig.mode).toBe("ANY");
-    expect(calls[1].toolConfig.functionCallingConfig.mode).toBe("AUTO");
-    expect(calls[0].tools[0].functionDeclarations[0].parametersJsonSchema).toBeDefined();
+    expect(calls[0].toolConfig?.functionCallingConfig.mode).toBe("ANY");
+    expect(calls[1].toolConfig?.functionCallingConfig.mode).toBe("AUTO");
+    expect("functionDeclarations" in calls[0].tools[0] && calls[0].tools[0].functionDeclarations[0].parametersJsonSchema).toBeDefined();
   });
 
   it("stops on a prompt block without running tools", async () => {

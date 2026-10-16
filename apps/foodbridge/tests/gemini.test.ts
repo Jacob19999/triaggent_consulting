@@ -67,7 +67,7 @@ describe("Gemini briefing route", () => {
       log.mockRestore(); vi.unstubAllGlobals(); vi.unstubAllEnvs();
     }
   });
-  it("restarts on Flash overload using Flash-Lite and identifies the fallback", async () => {
+  it("restarts on Flash overload using Gemini 3.5 Flash Lite and identifies the fallback", async () => {
     vi.stubEnv("GEMINI_API_KEY", "route-test-secret");
     vi.stubEnv("FOODBRIDGE_AI_MODEL", "gemini-flash-latest");
     vi.stubEnv("FOODBRIDGE_AI_REQUIRE_AUTH", "false");
@@ -80,8 +80,8 @@ describe("Gemini briefing route", () => {
       const result = await (await post()).json();
       expect(result.mode).toBe("ai");
       expect(result.model).toBe("gemini-flash-lite-test");
-      expect(result.note).toContain("Flash-Lite");
-      expect(String(fetcher.mock.calls[1][0])).toContain("gemini-flash-lite-latest");
+      expect(result.note).toContain("Gemini 3.5 Flash Lite");
+      expect(String(fetcher.mock.calls[1][0])).toContain("gemini-3.5-flash-lite");
       expect(JSON.parse(String(fetcher.mock.calls[1][1]?.body)).contents).toHaveLength(1);
     } finally { vi.unstubAllGlobals(); vi.unstubAllEnvs(); }
   });

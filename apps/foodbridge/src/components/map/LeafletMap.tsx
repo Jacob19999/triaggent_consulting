@@ -18,8 +18,13 @@ export interface MapMarker {
   id: string;
   lon: number;
   lat: number;
-  kind: "site" | "candidate" | "count";
+  kind: "site" | "candidate" | "count" | "type";
   label?: string;
+  /** "type" only: fill colour and a 24x24 SVG path drawn as the icon. */
+  color?: string;
+  glyph?: string;
+  /** "type" only: the coordinate marks an area (city, ZIP), not the address; drawn hollow. */
+  approx?: boolean;
   active?: boolean;
   size?: number;
   ringsMiles?: number[];
@@ -134,6 +139,13 @@ function markerIcon(m: MapMarker): L.DivIcon {
       iconSize: [26, 26],
       iconAnchor: [13, 13],
     });
+  if (m.kind === "type")
+    return L.divIcon({
+      className: "fb-pin",
+      html: `<div class="fb-pin-type${m.approx ? " is-approx" : ""}${m.active ? " is-active" : ""}" style="--c:${m.color ?? "var(--accent)"}"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="${m.glyph ?? ""}"/></svg></div>`,
+      iconSize: [18, 18],
+      iconAnchor: [9, 9],
+    });
   const s = m.size ?? 22;
   return L.divIcon({
     className: "fb-pin",
@@ -177,7 +189,7 @@ export function LeafletMap({
   const units = useRef<L.GeoJSON | null>(null);
   const byId = useRef(new Map<string, L.Path>());
   const tiles = useRef<L.TileLayer[]>([]);
-  const overlay = useRef<{ outlines?: L.GeoJSON; dashed?: L.GeoJSON; hatch?: L.GeoJSON; ring?: L.GeoJSON }>({});
+  const overlay = useRef<{ outlines?: L.GeoJSON; auditHalo?: L.GeoJSON; dashed?: L.GeoJSON; hatch?: L.GeoJSON; ring?: L.GeoJSON }>({});
   const markerLayer = useRef<L.LayerGroup | null>(null);
   const [hover, setHover] = useState<{ id: string; x: number; y: number } | null>(null);
   const [width, setWidth] = useState(800);
@@ -277,6 +289,20 @@ export function LeafletMap({
     el.current.addEventListener("mousedown", stopAuto);
     el.current.addEventListener("wheel", stopAuto, { passive: true });
     el.current.addEventListener("touchstart", stopAuto, { passive: true });
+    // Count circles are sized in pixels; shrink them at statewide zoom so neighbouring counties'
+    // circles do not pile up, and hide the number once it would be unreadable.
+    const box = el.current;
+    const scaleCounts = () => {
+      const k = Math.min(1.25, Math.max(0.62, 2 ** ((m.getZoom() - 6.75) * 0.9)));
+      box.style.setProperty("--fb-count-scale", k.toFixed(3));
+      box.classList.toggle("fb-counts-compact", k < 0.72);
+      // Site icons are denser than county counts: full icons from about zoom 8.5, dots below.
+      const ks = Math.min(1, Math.max(0.42, 2 ** ((m.getZoom() - 8.5) * 0.8)));
+      box.style.setProperty("--fb-site-scale", ks.toFixed(3));
+      box.classList.toggle("fb-sites-compact", ks < 0.7);
+    };
+    m.on("zoom zoomend", scaleCounts);
+    m.whenReady(scaleCounts);
     ro.observe(el.current);
     map.current = m;
     return () => {
@@ -312,6 +338,7 @@ export function LeafletMap({
     const m = map.current;
     if (!m) return;
     units.current?.remove();
+    setHover(null);
     byId.current.clear();
     const layer = L.geoJSON(toCollection(geometry), {
       style: (f) => baseStyle(String(f?.properties?.id)),
@@ -323,6 +350,7 @@ export function LeafletMap({
           mouseover: (e: L.LeafletMouseEvent) => {
             path.setStyle({ weight: 2.2, color: live.current.theme === "dark" ? "#ffffff" : "#0f1b2a" });
             path.bringToFront();
+            (["auditHalo", "dashed", "ring"] as const).forEach((k) => overlay.current[k]?.bringToFront());
             setHover({ id, x: e.containerPoint.x, y: e.containerPoint.y });
           },
           mousemove: (e: L.LeafletMouseEvent) => setHover({ id, x: e.containerPoint.x, y: e.containerPoint.y }),
@@ -346,7 +374,7 @@ export function LeafletMap({
       fitHome();
     }
     // Overlays sit above the units; re-add them so the order holds.
-    (["hatch", "outlines", "dashed", "ring"] as const).forEach((k) => overlay.current[k]?.bringToFront());
+    (["hatch", "outlines", "auditHalo", "dashed", "ring"] as const).forEach((k) => overlay.current[k]?.bringToFront());
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [geometry]);
 
@@ -354,7 +382,7 @@ export function LeafletMap({
   useEffect(() => {
     byId.current.forEach((path, id) => path.setStyle(baseStyle(id)));
     if (selected) byId.current.get(selected)?.bringToFront();
-    (["hatch", "outlines", "dashed", "ring"] as const).forEach((k) => overlay.current[k]?.bringToFront());
+    (["hatch", "outlines", "auditHalo", "dashed", "ring"] as const).forEach((k) => overlay.current[k]?.bringToFront());
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [fill, fillOpacity, dim, selected, theme]);
 
@@ -363,7 +391,7 @@ export function LeafletMap({
     const m = map.current;
     if (!m) return;
     const dark = theme === "dark";
-    const set = (key: "outlines" | "dashed" | "hatch" | "ring", geoms: Record<string, GeoJSONGeometry> | undefined, style: L.PathOptions) => {
+    const set = (key: "outlines" | "auditHalo" | "dashed" | "hatch" | "ring", geoms: Record<string, GeoJSONGeometry> | undefined, style: L.PathOptions) => {
       overlay.current[key]?.remove();
       overlay.current[key] =
         geoms && Object.keys(geoms).length
@@ -372,14 +400,16 @@ export function LeafletMap({
     };
     set("hatch", hatch, { className: "fb-hatch", stroke: true, color: dark ? "#e8edf2" : "#0f1b2a", weight: 0.7, opacity: 0.7, fill: true });
     set("outlines", outlines, { fill: false, color: dark ? "rgba(232,237,242,0.55)" : "rgba(15,27,42,0.5)", weight: 1 });
-    set("dashed", dashed, { fill: false, color: dark ? "#ffffff" : "#0f1b2a", weight: 1.8, dashArray: "5 4", opacity: 0.95 });
+    // D-052 audit call list: cyan dashes over a dark casing stay visible on every heat-ramp color.
+    set("auditHalo", dashed, { fill: false, color: "#0b1220", weight: 5, opacity: 0.95 });
+    set("dashed", dashed, { fill: false, color: "#67e8f9", weight: 2.5, dashArray: "7 4", opacity: 1, lineCap: "butt" });
     set("ring", ring ? { ring } : undefined, { fill: false, color: dark ? "#ffffff" : "#0f1b2a", weight: 3, opacity: 1 });
     if (selected) byId.current.get(selected)?.bringToFront();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [outlines, dashed, hatch, ring, theme]);
 
   // Markers and catchment rings.
-  const markerKey = JSON.stringify(markers.map((mk) => [mk.id, mk.lon, mk.lat, mk.kind, mk.label, mk.active, mk.size, mk.ringsMiles]));
+  const markerKey = JSON.stringify(markers.map((mk) => [mk.id, mk.lon, mk.lat, mk.kind, mk.label, mk.active, mk.size, mk.ringsMiles, mk.color, mk.glyph, mk.approx]));
   const markerRef = useRef(markers);
   markerRef.current = markers;
   useEffect(() => {

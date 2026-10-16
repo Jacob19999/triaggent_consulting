@@ -59,7 +59,7 @@ export default function LoginForm({ emailOnly }: { emailOnly: boolean }) {
         </Link>
         <Card title="Sign in to the live workspace" subtitle={emailOnly ? "Enter your email to create an account or sign in instantly." : "We email you a one-time sign-in link. No password to remember."}>
           {!liveAvailable ? (
-            <p className="text-[13px] text-muted">The live workspace is not configured on this deployment. Use the demo workspace instead.</p>
+            <p className="text-[13px] text-muted">The live workspace is not configured on this deployment. Use the county networks workspace instead.</p>
           ) : state === "sent" ? (
             <p className="text-[14px] text-ink">Check {email} for your sign-in link. You can close this tab.</p>
           ) : (
@@ -89,7 +89,7 @@ export default function LoginForm({ emailOnly }: { emailOnly: boolean }) {
               }
             }}
           >
-            Back to the demo workspace
+            Back to the county networks
           </Link>
         </p>
       </div>

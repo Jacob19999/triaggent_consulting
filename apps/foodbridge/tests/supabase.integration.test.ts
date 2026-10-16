@@ -1,6 +1,6 @@
 // Opt-in check of the app's payloads against a real Supabase project:
 //   SUPABASE_INTEGRATION=1 npx vitest run tests/supabase.integration.test.ts
-// Reads apps/foodbridge/.env.local. Inserts one labelled demo shelf with its reports, a
+// Reads apps/foodbridge/.env.local. Inserts one labelled county network with its reports, a
 // request, an alert state and a scenario, checks constraints and row-level security,
 // then deletes everything it created.
 import { randomUUID } from "node:crypto";
@@ -8,7 +8,7 @@ import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { demoInsertRows } from "@/lib/demoRows";
+import { buildNetworkData, networkInsertRows, type NetworkPayload } from "@/lib/networks";
 
 function env(): Record<string, string> {
   const file = path.join(__dirname, "../.env.local");
@@ -33,7 +33,8 @@ describe.runIf(run)("Supabase schema accepts the app's writes", () => {
     admin = createClient(e.NEXT_PUBLIC_SUPABASE_URL, e.SUPABASE_SECRET_KEY, { auth: { persistSession: false } });
     anon = createClient(e.NEXT_PUBLIC_SUPABASE_URL, e.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY, { auth: { persistSession: false } });
   });
-  const rows = demoInsertRows(randomUUID, 1);
+  const networks = JSON.parse(readFileSync(path.join(__dirname, "../public/data/networks.json"), "utf8")) as NetworkPayload;
+  const rows = { ...networkInsertRows(buildNetworkData(networks), randomUUID, 1), requests: [] as Record<string, unknown>[] };
   const shelfId = rows.shelves[0].id;
   rows.shelves[0].name = `Integration test — ${rows.shelves[0].name}`.slice(0, 120);
   const alertKey = `itest:${randomUUID()}`;

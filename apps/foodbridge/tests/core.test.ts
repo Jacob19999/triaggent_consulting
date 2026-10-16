@@ -4,7 +4,7 @@ import { describe, expect, it } from "vitest";
 import { computeAlerts } from "@/lib/alerts";
 import { allocate } from "@/lib/allocate";
 import { addMonths, workdays } from "@/lib/calendar";
-import { buildDemoData, DEMO_AS_OF } from "@/lib/demo";
+import { buildNetworkData, NETWORK_AS_OF, NETWORKS_SHA, SITE_TYPES, siteTypesFrom, type NetworkPayload } from "@/lib/networks";
 import { forecastNext } from "@/lib/forecast";
 import { haversineMiles } from "@/lib/geo";
 import { prioritize } from "@/lib/priority";
@@ -138,18 +138,62 @@ describe.runIf(research.fei.status === "ready")("FEI consistency with the build"
   });
 });
 
-describe("alerts on the demo network", () => {
-  const demo = buildDemoData();
-  const { alerts, outlooks } = computeAlerts({ shelves: demo.shelves, reports: demo.reports, asOf: DEMO_AS_OF });
-  const has = (shelf: string, category: string) =>
-    alerts.some((a) => a.shelfId === shelf && a.category === category);
-  it("flags each built-in demo situation", () => {
-    expect(has("demo-chippewa-a", "stock")).toBe(true);
-    expect(has("demo-wadena-a", "reporting")).toBe(true);
-    expect(has("demo-lyon-a", "capacity")).toBe(true);
-    expect(has("demo-hennepin-b", "demand")).toBe(true);
-    expect(has("demo-todd-a", "turnaways")).toBe(true);
-    expect(has("demo-st-louis-a", "data_quality")).toBe(true);
+describe("county networks (statewide extract, county grain)", () => {
+  const payload = JSON.parse(readFileSync(path.join(__dirname, "../public/data/networks.json"), "utf8")) as NetworkPayload;
+  const net = buildNetworkData(payload);
+  const { alerts, outlooks } = computeAlerts({ shelves: net.shelves, reports: net.reports, asOf: NETWORK_AS_OF });
+  it("has one labelled network per reporting county and nothing past the as-of month", () => {
+    expect(net.shelves).toHaveLength(86);
+    expect(net.shelves.some((s) => s.name.startsWith("Wilkin"))).toBe(false);
+    expect(net.shelves.every((s) => s.is_demo && s.name.endsWith("County network"))).toBe(true);
+    expect(net.reports.every((r) => r.month <= NETWORK_AS_OF && r.month < research.meta.forecast_target)).toBe(true);
+  });
+  it("seeds labelled hypothetical requests, one per county, each quoting real county numbers", () => {
+    expect(net.requests.length).toBeGreaterThanOrEqual(5);
+    expect(net.requests.every((r) => r.hypothetical && r.id.startsWith("hyp-"))).toBe(true);
+    const shelfIds = new Set(net.shelves.map((s) => s.id));
+    expect(net.requests.every((r) => shelfIds.has(r.shelf_id))).toBe(true);
+    expect(new Set(net.requests.map((r) => r.shelf_id)).size).toBe(net.requests.length);
+    expect(net.requests.every((r) => /\d/.test(r.message) && r.created_at > `${NETWORK_AS_OF}-31`)).toBe(true);
+    expect(new Set(net.requests.map((r) => r.kind)).size).toBeGreaterThanOrEqual(4);
+    expect(buildNetworkData(payload).requests).toEqual(net.requests); // deterministic
+  });
+  it("site-type counts add up to each network's reporting sites in the as-of month", () => {
+    const mix = siteTypesFrom(payload);
+    expect(mix.month).toBe(NETWORK_AS_OF);
+    for (const c of payload.counties) {
+      const sites = c.rows.find((r) => r[0] === NETWORK_AS_OF)?.[1] ?? 0;
+      const typed = Object.values(mix.counties[c.fips] ?? {}).reduce((s, t) => s + (t?.sites ?? 0), 0);
+      expect(typed).toBe(sites);
+    }
+    expect(Object.keys(mix.counties).every((f) => Object.keys(mix.counties[f]).every((t) => (SITE_TYPES as readonly string[]).includes(t)))).toBe(true);
+  });
+  it("year-earlier site types add up to the same month a year earlier", () => {
+    const mix = siteTypesFrom(payload);
+    const prior = mix.prior.month!;
+    expect(prior).toBe(`${Number(NETWORK_AS_OF.slice(0, 4)) - 1}${NETWORK_AS_OF.slice(4)}`);
+    for (const c of payload.counties) {
+      const sites = c.rows.find((r) => r[0] === prior)?.[1] ?? 0;
+      const typed = Object.values(mix.prior.counties[c.fips] ?? {}).reduce((s, t) => s + (t?.sites ?? 0), 0);
+      expect(typed).toBe(sites);
+    }
+  });
+  it("matches the bundle's fingerprint and the statewide history", () => {
+    expect(payload.meta.sha256).toBe(NETWORKS_SHA);
+    const july = net.reports.filter((r) => r.month === NETWORK_AS_OF).reduce((s, r) => s + r.households, 0);
+    expect(july).toBe(research.history.find((h) => h.month === NETWORK_AS_OF)!.HouseholdsTotal);
+  });
+  it("leaves fields the extract lacks blank instead of inventing them", () => {
+    expect(net.reports.every((r) => r.inventory_lbs == null && r.pounds_received == null && r.turned_away == null)).toBe(true);
+    expect(net.shelves.every((s) => s.capacity_households == null && s.storage_lbs == null)).toBe(true);
+    expect(alerts.some((a) => ["stock", "capacity", "turnaways"].includes(a.category))).toBe(false);
+  });
+  it("each network's run rate reproduces the submitted county forecast (D-045)", () => {
+    for (const o of outlooks) {
+      const fc = research.counties.find((c) => c.fips === o.shelf.county_fips)!.forecast;
+      expect(o.households!.yhat / fc.HouseholdsTotal!.yhat! - 1).toBeCloseTo(0, 2);
+      expect(o.pounds!.yhat / fc.PoundsTotal!.yhat! - 1).toBeCloseTo(0, 2);
+    }
   });
   it("every alert carries an action and a source", () => {
     for (const a of alerts) {
@@ -158,14 +202,11 @@ describe("alerts on the demo network", () => {
     }
   });
   it("prioritization puts manager overrides first", () => {
-    const shelves = demo.shelves.map((s) => (s.id === "demo-olmsted-a" ? { ...s, priority_status: "urgent" as const } : s));
-    const ol = computeAlerts({ shelves, reports: demo.reports, asOf: DEMO_AS_OF }).outlooks;
-    expect(prioritize(ol)[0].outlook.shelf.id).toBe("demo-olmsted-a");
-    expect(outlooks.length).toBe(demo.shelves.length);
-  });
-  it("demo shelves are labelled and never report beyond the as-of month", () => {
-    expect(demo.shelves.every((s) => s.is_demo && s.name.startsWith("Demo shelf"))).toBe(true);
-    expect(demo.reports.every((r) => r.month <= DEMO_AS_OF)).toBe(true);
+    const pick = net.shelves[40].id;
+    const shelves = net.shelves.map((s) => (s.id === pick ? { ...s, priority_status: "urgent" as const } : s));
+    const ol = computeAlerts({ shelves, reports: net.reports, asOf: NETWORK_AS_OF }).outlooks;
+    expect(prioritize(ol)[0].outlook.shelf.id).toBe(pick);
+    expect(outlooks.length).toBe(net.shelves.length);
   });
 });
 
