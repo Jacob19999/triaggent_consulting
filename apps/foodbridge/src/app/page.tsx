@@ -122,11 +122,11 @@ export default function Home() {
         <h2 className="text-[12px] font-semibold uppercase tracking-[0.1em] text-muted">Workspaces</h2>
         <div className="mt-3 grid grid-cols-1 gap-4 md:grid-cols-3">
           {doors.map((d) => (
+            <div key={d.href} className="flex flex-col gap-3">
             <Link
-              key={d.href}
               href={d.href}
               onClick={() => d.role && setRole(d.role)}
-              className="group rounded-[var(--radius-card)] border border-line bg-surface p-5 shadow-[var(--shadow)] transition-all hover:-translate-y-0.5 hover:border-line-strong hover:shadow-[var(--shadow-lg)]"
+              className="group flex-1 rounded-[var(--radius-card)] border border-line bg-surface p-5 shadow-[var(--shadow)] transition-all hover:-translate-y-0.5 hover:border-line-strong hover:shadow-[var(--shadow-lg)]"
             >
               <span className="grid h-10 w-10 place-items-center rounded-lg bg-[var(--accent-soft)] text-accent">
                 <Icon name={d.icon} className="h-5 w-5" />
@@ -142,6 +142,16 @@ export default function Home() {
                 Open <Icon name="arrow" className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
               </span>
             </Link>
+            {d.role === "manager" && (
+              <Link
+                href="/present"
+                onClick={() => setRole("manager")}
+                className={cx(buttonClass("primary"), "h-11 justify-center text-[14.5px]")}
+              >
+                <Icon name="present" /> Start the presentation
+              </Link>
+            )}
+            </div>
           ))}
         </div>
 

@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import type { SnapshotT } from "@/lib/agent/tools";
+import { BRIEF_SAVED_EVENT } from "@/lib/briefs";
 import { addMonths, monthLabel } from "@/lib/calendar";
 import { downloadText, fmt } from "@/lib/format";
 import { countiesByFips } from "@/lib/research";
@@ -71,6 +72,8 @@ interface AgentResult {
   toolCalls: { name: string; input: unknown }[];
   note?: string;
   error?: string;
+  saved?: boolean;
+  id?: string;
 }
 
 export function AgentPanel({
@@ -87,7 +90,7 @@ export function AgentPanel({
   label?: string;
 }) {
   const snapshot = useSnapshot(shelfId);
-  const { asOf } = useData();
+  const { asOf, session } = useData();
   const [busy, setBusy] = useState(false);
   const [result, setResult] = useState<AgentResult | null>(null);
   const run = async () => {
@@ -101,6 +104,7 @@ export function AgentPanel({
       });
       const body = (await res.json()) as AgentResult;
       setResult(res.ok ? body : { mode: "offline", markdown: "", toolCalls: [], error: body.error ?? res.statusText });
+      if (res.ok && body.id) window.dispatchEvent(new CustomEvent(BRIEF_SAVED_EVENT, { detail: { id: body.id } }));
     } catch (e) {
       setResult({ mode: "offline", markdown: "", toolCalls: [], error: String(e) });
     } finally {
@@ -120,6 +124,15 @@ export function AgentPanel({
         )}
       </div>
       {result?.error && <p className="text-[13px] text-[var(--critical-text)]">{result.error}</p>}
+      {result?.markdown && session.signedIn && result.saved && (
+        <p className="text-[12.5px] text-muted">Saved. Every account can open it under Previously generated.</p>
+      )}
+      {result?.markdown && session.signedIn && result.saved === false && (
+        <p className="text-[12.5px] text-[var(--critical-text)]">This briefing could not be saved.</p>
+      )}
+      {result?.markdown && !session.signedIn && (
+        <p className="text-[12.5px] text-muted">Sign in to save this briefing for every account.</p>
+      )}
       {result?.markdown && (
         <Card
           title={result.mode === "ai" ? "Briefing" : "Offline briefing"}

@@ -49,11 +49,11 @@ const SECTIONS = [
   },
   {
     title: "AI briefing agent",
-    body: "Server-side function calling with Google Gemini. Tools are read-only: the policy timeline, county profiles and rankings, research findings, the FEI method, and the caller's own alerts and network totals. The system prompt forbids computing numbers, requires a source after each figure, and applies the team's wording rules (D-052, D-053). Without an API key, or if the model declines, the same facts are returned as an offline briefing.",
+    body: "Server-side function calling with Google Gemini. Tools are read-only: the policy timeline, county profiles and rankings, research findings, the FEI method, and the caller's own alerts and network totals. The system prompt forbids computing numbers, requires a source after each figure, and applies the team's wording rules (D-052, D-053). Without an API key, or if the model declines, the same facts are returned as an offline briefing. Each generated briefing is stored so every signed-in account can open it later.",
   },
   {
     title: "Data and privacy contract",
-    body: "The app ships county and tract aggregates only, chosen column by column by mi.foodbridge_bundle from tracked outputs/ tables, plus public Census and USDA tract fields. No site rows, site keys, block IDs, per-tract shelf counts or Map the Meal Gap county values (D-021, D-050). Shelf markers sit at county centres with counts. A privacy scan runs on every bundle build and in npm run check. Supabase holds only app state (shelves registered in the app, their reports, requests, alert follow-up, scenarios) behind row-level security.",
+    body: "The app ships county and tract aggregates only, chosen column by column by mi.foodbridge_bundle from tracked outputs/ tables, plus public Census and USDA tract fields. No site rows, site keys, block IDs, per-tract shelf counts or Map the Meal Gap county values (D-021, D-050). Shelf markers sit at county centres with counts. A privacy scan runs on every bundle build and in npm run check. Supabase holds only app state (shelves registered in the app, their reports, requests, alert follow-up, scenarios, saved briefings) behind row-level security.",
   },
   {
     title: "Stack and deployment",
@@ -83,7 +83,7 @@ export default function Technical() {
             <Box x={290} y={95} w={210} h={130} title="mi.foodbridge_bundle" lines={["column allowlist", "FEI adapter (pillar letters)", "privacy scan", "→ data/research.json", "→ public/data/fei-tracts.json"]} tone="deep" />
             <Box x={560} y={20} w={200} h={130} title="Next.js app on Vercel" lines={["Manager workspace", "Food shelf portal", "Findings & presentation", "forecast · alerts · scenarios", "run in the browser"]} />
             <Box x={560} y={180} w={200} h={120} title="/api/agent (server)" lines={["Gemini function calling", "read-only retrieval tools", "cited briefing", "offline fallback"]} />
-            <Box x={820} y={20} w={150} h={130} title="Supabase" lines={["Postgres + Auth", "row-level security", "shelves, reports,", "requests, alerts,", "scenarios"]} />
+            <Box x={820} y={20} w={150} h={130} title="Supabase" lines={["Postgres + Auth", "row-level security", "shelves, reports,", "requests, alerts,", "scenarios, briefs"]} />
             <Box x={820} y={180} w={150} h={120} title="Google Gemini API" lines={["model: Gemini Flash", "key server-side", "refusal fallback"]} />
             <Arrow x1={230} y1={80} x2={290} y2={140} label="aggregates" />
             <Arrow x1={230} y1={240} x2={290} y2={185} />

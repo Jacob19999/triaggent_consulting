@@ -35,6 +35,6 @@ export const PILLARS: { key: Pillar; label: string; weight: number; color: strin
     label: "Demographics",
     weight: 0.15,
     color: "var(--p-v)",
-    what: "Demographic vulnerability: SVI household characteristics, SVI minority status (modest weight) and the 2020 child share.",
+    what: "Demographic vulnerability: SVI minority status (half the pillar), SVI household characteristics and the 2020 child share.",
   },
 ];

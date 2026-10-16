@@ -49,6 +49,14 @@ for (const dir of targets) {
         failed = true;
       }
     }
+    if (name === "deck.json") {
+      const target = JSON.parse(readFileSync(path.join(root, "data", "research.json"), "utf8")).meta.forecast_target;
+      const late = JSON.parse(text).q4_prices.filter((p) => p.month >= target);
+      if (late.length) {
+        console.error(`FAIL deck.json: price series reaches ${late[0].month}`);
+        failed = true;
+      }
+    }
     if (name === "research.json") {
       const b = JSON.parse(text);
       const late = b.history.filter((h) => h.month >= b.meta.forecast_target);

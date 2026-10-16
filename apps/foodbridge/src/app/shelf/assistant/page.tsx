@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { AgentPanel } from "@/components/AgentPanel";
+import { BriefLibrary } from "@/components/BriefLibrary";
 import { Card, Field, Input, PageHeader, SourceNote } from "@/components/ui";
 import { useData } from "@/components/DataProvider";
 
@@ -29,6 +30,7 @@ export default function ShelfAssistant() {
           <SourceNote>Questions about a person&apos;s eligibility or benefits go to the program or a staff member, not the assistant.</SourceNote>
         </Card>
       </div>
+      <BriefLibrary />
     </>
   );
 }

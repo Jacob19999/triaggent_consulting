@@ -6,8 +6,9 @@ import { runAgent } from "@/lib/agent/run";
 import { createGeminiClient, DEFAULT_AI_MODEL, FALLBACK_AI_MODEL, GeminiAPIError } from "@/lib/agent/gemini";
 import { clientIp, limited } from "@/lib/agent/limit";
 import { Snapshot } from "@/lib/agent/tools";
+import { briefRow, isApprovedRole } from "@/lib/briefs";
 import { supabaseConfigured } from "@/lib/config";
-import { currentProfile } from "@/lib/supabase/server";
+import { currentProfile, serverSupabase } from "@/lib/supabase/server";
 
 export const runtime = "nodejs";
 export const maxDuration = 120;
@@ -31,13 +32,44 @@ export async function POST(req: NextRequest) {
 
   // Live workspaces require a signed-in, approved user. The county networks workspace
   // carries only county aggregates, behind the portal password.
-  if (body.snapshot.workspace === "live" || process.env.FOODBRIDGE_AI_REQUIRE_AUTH === "true") {
-    const profile = supabaseConfigured ? await currentProfile() : null;
-    if (!profile || profile.role === "pending") return NextResponse.json({ error: "Sign in to use the briefing agent." }, { status: 401 });
+  const profile = supabaseConfigured ? await currentProfile() : null;
+  if ((body.snapshot.workspace === "live" || process.env.FOODBRIDGE_AI_REQUIRE_AUTH === "true") && !isApprovedRole(profile?.role)) {
+    return NextResponse.json({ error: "Sign in to use the briefing agent." }, { status: 401 });
   }
 
+  const finish = async (payload: { mode: "ai" | "offline"; markdown: string; toolCalls: { name: string; input: unknown }[]; model?: string; note?: string }) => {
+    const id = await saveBrief(payload);
+    return NextResponse.json({ ...payload, saved: Boolean(id), ...(id ? { id } : {}) });
+  };
+
+  const saveBrief = async (payload: { mode: "ai" | "offline"; markdown: string; toolCalls: { name: string; input: unknown }[]; model?: string; note?: string }) => {
+    if (!isApprovedRole(profile?.role)) return null;
+    const row = briefRow({
+      mode: body.mode,
+      resultMode: payload.mode,
+      asOf: body.snapshot.asOf,
+      workspace: body.snapshot.workspace,
+      markdown: payload.markdown,
+      county: body.county,
+      question: body.question,
+      shelfName: body.snapshot.shelf?.name,
+      model: payload.model,
+      note: payload.note,
+      toolCalls: payload.toolCalls,
+    });
+    if (!row) return null;
+    const supabase = await serverSupabase();
+    if (!supabase) return null;
+    const { data, error } = await supabase.from("briefs").insert(row).select("id").single();
+    if (error || !data?.id) {
+      console.error("brief save failed", error?.code ?? error?.message ?? "no id");
+      return null;
+    }
+    return data.id as string;
+  };
+
   const offline = () =>
-    NextResponse.json({
+    finish({
       mode: "offline",
       markdown: offlineBriefing(body.mode, body.snapshot, body.county),
       toolCalls: [],
@@ -72,11 +104,11 @@ export async function POST(req: NextRequest) {
       usedFallback = true;
     }
     if (result.status === "ok" && result.markdown)
-      return NextResponse.json({
+      return finish({
         mode: "ai", model: result.model, markdown: result.markdown, toolCalls: result.toolCalls,
         ...(usedFallback ? { note: "Gemini Flash is busy; this summary uses Gemini 3.5 Flash Lite." } : {}),
       });
-    return NextResponse.json({
+    return finish({
       mode: "offline",
       markdown: offlineBriefing(body.mode, body.snapshot, body.county),
       toolCalls: result.toolCalls,
@@ -88,7 +120,7 @@ export async function POST(req: NextRequest) {
   } catch (e) {
     const status = e instanceof GeminiAPIError ? e.status : 500;
     console.error("Gemini briefing failed", { status });
-    return NextResponse.json({
+    return finish({
       mode: "offline",
       markdown: offlineBriefing(body.mode, body.snapshot, body.county),
       toolCalls: [],

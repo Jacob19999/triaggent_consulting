@@ -102,7 +102,7 @@ export default function FindingsPage() {
         title="Need and demand: where they agree, where they split, what to do on Monday"
         description="The team's generated answers to the six scored graduate questions, each tied to a decision. Every number here is read from the analysis outputs."
         actions={
-          <Link href="/findings/present" className="inline-flex h-9 items-center rounded-lg border border-accent bg-accent px-3.5 text-[13.5px] font-medium text-[var(--accent-ink)] hover:bg-[var(--accent-hover)]">
+          <Link href="/present" className="inline-flex h-9 items-center rounded-lg border border-accent bg-accent px-3.5 text-[13.5px] font-medium text-[var(--accent-ink)] hover:bg-[var(--accent-hover)]">
             Open presentation
           </Link>
         }

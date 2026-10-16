@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { AgentPanel } from "@/components/AgentPanel";
+import { BriefLibrary } from "@/components/BriefLibrary";
 import { CountyAlertSelect } from "@/components/CountyAlertSelect";
 import { Card, Field, Input, PageHeader, Select, SourceNote } from "@/components/ui";
 import { research } from "@/lib/research";
@@ -71,6 +72,7 @@ export default function BriefingPage() {
           label={mode === "ask" ? "Ask" : "Generate briefing"}
         />
       </div>
+      <BriefLibrary />
     </>
   );
 }

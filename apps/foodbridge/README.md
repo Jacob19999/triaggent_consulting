@@ -111,10 +111,12 @@ county and tract aggregates only. Pages send `noindex` by default.
 
 ## Set up Supabase (live workspace)
 
-1. Create a project. In **SQL Editor**, run `supabase/migrations/0001_foodbridge.sql`.
-   It creates `profiles`, `shelves`, `shelf_reports`, `shelf_requests`, `alert_states` and
-   `scenarios` with row-level security: managers see the network; a shelf user sees and
-   edits only its own shelf and cannot change its priority or manager note.
+1. Create a project. In **SQL Editor**, run `supabase/migrations/0001_foodbridge.sql`,
+   then `supabase/migrations/0002_briefs.sql`. The first creates `profiles`, `shelves`,
+   `shelf_reports`, `shelf_requests`, `alert_states` and `scenarios` with row-level security:
+   managers see the network; a shelf user sees and edits only its own shelf and cannot change
+   its priority or manager note. The second stores generated briefings so every manager and
+   shelf account can read them. An existing project only needs `0002_briefs.sql`.
 2. **Authentication → URL configuration:** Site URL = your Vercel URL; add
    `https://<your-app>/auth/callback` and `http://localhost:3000/auth/callback` as redirect URLs.
 3. Sign in once at `/login`, then promote yourself:

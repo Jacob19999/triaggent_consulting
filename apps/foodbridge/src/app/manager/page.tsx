@@ -333,6 +333,9 @@ export default function ManagerDashboard() {
         }
         actions={
           <>
+            <Link href="/present" className={buttonClass("secondary")}>
+              <Icon name="present" /> Start presentation
+            </Link>
             <Link href="/manager/scenarios" className={buttonClass("secondary")}>
               <Icon name="target" /> Plan a site
             </Link>

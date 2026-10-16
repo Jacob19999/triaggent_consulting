@@ -45,6 +45,18 @@ export function workdays(month: string): number {
   return count;
 }
 
+/** Each day of a YYYY-MM month with its weekday (0 = Sunday) and whether it is a working day. */
+export function monthDays(month: string): { day: number; dow: number; work: boolean }[] {
+  const [y, m] = month.split("-").map(Number);
+  const closed = holidays(y);
+  const days = new Date(Date.UTC(y, m, 0)).getUTCDate();
+  return Array.from({ length: days }, (_, i) => {
+    const date = new Date(Date.UTC(y, m - 1, i + 1));
+    const dow = date.getUTCDay();
+    return { day: i + 1, dow, work: dow !== 0 && dow !== 6 && !closed.has(date.toISOString().slice(0, 10)) };
+  });
+}
+
 export function daysInMonth(month: string): number {
   const [y, m] = month.split("-").map(Number);
   return new Date(Date.UTC(y, m, 0)).getUTCDate();

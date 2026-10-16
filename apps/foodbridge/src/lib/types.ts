@@ -220,6 +220,8 @@ export interface ResearchBundle {
       q6_flagged: string[];
       q7_state: { signal: ForecastSignal; yhat: number; counties: number }[];
       q7_intervals: { target_month: string; signal: ForecastSignal; coverage80: number; coverage95: number }[];
+      /** Development error pooled over the August 2023–2025 folds (outputs/eval/q7_backtest.csv). */
+      q7_backtest: { signal: ForecastSignal; model: string; rmse: number; wape_pct: number; folds: string[] }[];
       q8: {
         lila_tracts: number;
         lila_without_site: number;

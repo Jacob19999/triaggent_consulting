@@ -18,6 +18,7 @@ export const NAV: Record<Area, NavGroup[]> = {
       items: [
         { href: "/manager", label: "Command center", icon: "dashboard" },
         { href: "/manager/fei", label: "Equity index (FEI)", icon: "index" },
+        { href: "/present", label: "Presentation", icon: "present" },
       ],
     },
     {
@@ -64,7 +65,8 @@ export const NAV: Record<Area, NavGroup[]> = {
       label: "Research",
       items: [
         { href: "/findings", label: "Story & findings", icon: "book" },
-        { href: "/findings/present", label: "Presentation", icon: "present" },
+        { href: "/present", label: "Judging talk", icon: "present" },
+        { href: "/findings/present", label: "Offline PDFs", icon: "list" },
         { href: "/findings/technical", label: "Technical details", icon: "settings" },
         { href: "/findings/sources", label: "Sources & data", icon: "list" },
       ],

@@ -195,8 +195,13 @@ export default function Present() {
     <>
       <PageHeader
         eyebrow="Presentation"
-        title="Present from the app"
-        description="Six slides with live numbers from the bundle. ← → to move, F for full screen. The full 17-slide deck and the handout are below as PDFs (they also work offline)."
+        title="Offline PDFs and backup slides"
+        description="The judging talk is the live deck at /present (← → to move, N for notes, F for full screen). This page keeps the six-slide walkthrough and the plan-B PDFs."
+        actions={
+          <a href="/present" className="inline-flex h-9 items-center rounded-lg border border-accent bg-accent px-3.5 text-[13.5px] font-medium text-[var(--accent-ink)] hover:bg-[var(--accent-hover)]">
+            Open judging talk
+          </a>
+        }
       />
       <div ref={frame} className="relative rounded-[14px] border border-line bg-surface p-6 sm:p-10" style={{ minHeight: 520 }}>
         {slides[i]}

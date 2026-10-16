@@ -33,6 +33,7 @@ export function TimeChart({
   label,
   height = 220,
   format = fmt.compact,
+  showBand = true,
 }: {
   points: SeriesPoint[];
   forecast?: ForecastBand | null;
@@ -40,6 +41,8 @@ export function TimeChart({
   label: string;
   height?: number;
   format?: (v: number) => string;
+  /** False draws the forecast point only (e.g. state totals, whose bands are never summed from counties). */
+  showBand?: boolean;
 }) {
   const W = 640;
   const H = height;
@@ -98,8 +101,12 @@ export function TimeChart({
         {forecast && (
           <g>
             <line x1={x(fi - 1)} x2={x(fi)} y1={y(observed[observed.length - 1]?.value ?? forecast.yhat)} y2={y(forecast.yhat)} stroke={color} strokeWidth={2} strokeDasharray="4 3" />
-            <rect x={x(fi) - 9} width={18} y={y(forecast.hi95)} height={Math.max(1, y(forecast.lo95) - y(forecast.hi95))} rx={4} fill={color} opacity={0.16} />
-            <rect x={x(fi) - 9} width={18} y={y(forecast.hi80)} height={Math.max(1, y(forecast.lo80) - y(forecast.hi80))} rx={4} fill={color} opacity={0.32} />
+            {showBand && (
+              <>
+                <rect x={x(fi) - 9} width={18} y={y(forecast.hi95)} height={Math.max(1, y(forecast.lo95) - y(forecast.hi95))} rx={4} fill={color} opacity={0.16} />
+                <rect x={x(fi) - 9} width={18} y={y(forecast.hi80)} height={Math.max(1, y(forecast.lo80) - y(forecast.hi80))} rx={4} fill={color} opacity={0.32} />
+              </>
+            )}
             <circle cx={x(fi)} cy={y(forecast.yhat)} r={5} fill="var(--surface)" stroke={color} strokeWidth={2} />
           </g>
         )}
@@ -123,7 +130,7 @@ export function TimeChart({
           <div className="tabular text-ink-2">
             {label}: <span className="font-semibold text-ink">{all[hover].value == null ? "—" : fmt.int(all[hover].value!)}</span>
           </div>
-          {all[hover].forecast && forecast && (
+          {all[hover].forecast && forecast && showBand && (
             <div className="tabular text-muted">
               80%: {fmt.int(forecast.lo80)}–{fmt.int(forecast.hi80)} · 95%: {fmt.int(forecast.lo95)}–{fmt.int(forecast.hi95)}
             </div>

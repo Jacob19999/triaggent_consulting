@@ -25,6 +25,8 @@ const csp = [
 const nextConfig: NextConfig = {
   reactStrictMode: true,
   poweredByHeader: false,
+  // The dev-mode "N" badge sits over slide footers during rehearsal.
+  devIndicators: false,
   eslint: { ignoreDuringBuilds: true },
   async headers() {
     return [

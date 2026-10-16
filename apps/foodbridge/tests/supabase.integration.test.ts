@@ -39,8 +39,10 @@ describe.runIf(run)("Supabase schema accepts the app's writes", () => {
   rows.shelves[0].name = `Integration test — ${rows.shelves[0].name}`.slice(0, 120);
   const alertKey = `itest:${randomUUID()}`;
   const scenarioId = randomUUID();
+  const briefId = randomUUID();
 
   afterAll(async () => {
+    await admin.from("briefs").delete().eq("id", briefId);
     await admin.from("scenarios").delete().eq("id", scenarioId);
     await admin.from("shelves").delete().eq("id", shelfId); // cascades to reports, requests, alert states
   });
@@ -75,6 +77,22 @@ describe.runIf(run)("Supabase schema accepts the app's writes", () => {
     expect(bad.error).not.toBeNull();
     const badMonth = await admin.from("shelf_reports").insert({ ...rows.reports[0], month: "2026-13" });
     expect(badMonth.error).not.toBeNull();
+  });
+
+  it("stores a briefing the public key cannot read", async () => {
+    const saved = await admin.from("briefs").insert({
+      id: briefId,
+      mode: "briefing",
+      result_mode: "offline",
+      title: "Integration test briefing",
+      as_of: "2026-07",
+      workspace: "demo",
+      markdown: "Integration test briefing body.",
+      tool_calls: [],
+    });
+    expect(saved.error).toBeNull();
+    const hidden = await anon.from("briefs").select("id").eq("id", briefId);
+    expect(hidden.data ?? []).toHaveLength(0);
   });
 
   it("row-level security hides everything from the public key", async () => {
