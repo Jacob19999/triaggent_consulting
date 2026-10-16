@@ -23,6 +23,15 @@ With no environment variables the **demo workspace** works end to end: 14 synthe
 "Demo shelf" records live in the browser (scaled from county averages, not site data).
 Copy `.env.example` to `.env.local` to enable the live workspace and the AI agent.
 
+For temporary prototype access, set `FOODBRIDGE_EMAIL_ONLY_LOGIN=true` in
+`.env.local` or the deployment environment. Entering an email at `/login` creates the
+account if needed and signs in
+immediately, without a password, inbox link or approval step. New and pending accounts
+receive manager access; existing shelf accounts keep their role. This mode treats the
+email as an account selector and does not verify ownership. Requests must come from
+the app's own origin. The mode is off unless explicitly enabled. Remove the setting to
+restore emailed sign-in links and manager approval for new accounts.
+
 Checks:
 
 ```bash
@@ -56,7 +65,7 @@ the Q6 need percentile, labelled as a placeholder (FoodBridge never computes its
 
 ## Deploy on Vercel
 
-1. Vercel → **Add New Project** → import `Jacob19999/triaggent_consulting`.
+1. Vercel → **Add New Project** → import `Jacob19999/maverick_intelligence_mnsu`.
 2. **Root Directory:** `apps/foodbridge`. Framework preset: Next.js. Node 20 or later.
 3. **Environment variables** (Production and Preview):
 
@@ -65,6 +74,7 @@ the Q6 need percentile, labelled as a placeholder (FoodBridge never computes its
    | `NEXT_PUBLIC_SUPABASE_URL` | Live workspace | yes (public) |
    | `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | Live workspace (RLS applies) | yes (public) |
    | `SUPABASE_SECRET_KEY` | Granting shelf access (`/api/admin/invite`) | **no, server only** |
+   | `FOODBRIDGE_EMAIL_ONLY_LOGIN` | Optional `true`: immediate prototype sign-in and manager access for new accounts | no |
    | `ANTHROPIC_API_KEY` | AI briefing (`/api/agent`); offline briefing without it | **no, server only** |
    | `FOODBRIDGE_AI_MODEL` | Optional, default `claude-opus-5-5` | no |
    | `FOODBRIDGE_AI_REQUIRE_AUTH` | Optional `true`: only signed-in users may call the agent | no |
