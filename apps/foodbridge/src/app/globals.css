@@ -1,0 +1,416 @@
+@import "tailwindcss";
+
+/* `dark:` follows the app's theme switch (html[data-theme]), not only the OS setting. */
+@custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
+
+/* FoodBridge tokens. Brand mark: deep #143f35 + lime #d9e7a9. Interface: cool neutral
+   surfaces, one teal-green accent, a dark navy workspace modelled on the BEI dashboard.
+   Data colors were validated with the dataviz palette checker (signals pass all-pairs
+   CVD and contrast in both modes). The theme is set on <html data-theme> before paint. */
+:root {
+  color-scheme: light;
+  --paper: #f2f4f7;
+  --surface: #ffffff;
+  --surface-2: #f5f7fa;
+  --surface-3: #eaeef3;
+  --ink: #0f1b2a;
+  --ink-2: #3c4a5b;
+  --muted: #687789;
+  --line: #e1e6ed;
+  --line-strong: #cbd3de;
+  --green: #0f5e47;
+  --deep: #143f35;
+  --lime: #d9e7a9;
+  --accent: #0b7a63;
+  --accent-hover: #09664f;
+  --accent-ink: #ffffff;
+  --accent-soft: color-mix(in srgb, var(--accent) 10%, transparent);
+  --focus: #2a78d6;
+  --shadow: 0 1px 2px rgba(15, 27, 42, 0.05), 0 1px 3px rgba(15, 27, 42, 0.06);
+  --shadow-lg: 0 12px 32px rgba(15, 27, 42, 0.14), 0 2px 6px rgba(15, 27, 42, 0.08);
+
+  /* Navigation rail stays dark in both themes. */
+  --rail: #0a1520;
+  --rail-2: #111f2c;
+  --rail-line: #1b2b3a;
+  --rail-ink: #e6edf3;
+  --rail-muted: #8396a8;
+
+  --map-bg: #e8edf2;
+  --glass: color-mix(in srgb, var(--surface) 92%, transparent);
+
+  --sig-households: #0b8f86;
+  --sig-pounds: #b45309;
+  --sig-individuals: #4f46e5;
+
+  --seq-1: #cde2fb;
+  --seq-2: #86b6ef;
+  --seq-3: #3987e5;
+  --seq-4: #1c5cab;
+  --seq-5: #0d366b;
+  --div-neg: #2a78d6;
+  --div-mid: #f0efec;
+  --div-pos: #e34948;
+  --nodata: #e6e8e1;
+
+  --good: #0ca30c;
+  --warning: #fab219;
+  --serious: #ec835a;
+  --critical: #d03b3b;
+  --good-text: #006300;
+  --warning-text: #8a5a00;
+  --serious-text: #9a3f17;
+  --critical-text: #a32020;
+
+  --p-n: #2a78d6;
+  --p-s: #eb6834;
+  --p-t: #1baf7a;
+  --p-m: #eda100;
+  --p-v: #e87ba4;
+
+  --age-children: #2a78d6;
+  --age-adults: #1baf7a;
+  --age-seniors: #eda100;
+}
+
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --paper: #0b1219;
+  --surface: #111b25;
+  --surface-2: #16222e;
+  --surface-3: #1c2a38;
+  --ink: #e8edf2;
+  --ink-2: #b3c0cd;
+  --muted: #7f90a3;
+  --line: #213141;
+  --line-strong: #2e4255;
+  --green: #9fd4b8;
+  --deep: #0b2a22;
+  --accent: #3ccf9f;
+  --accent-hover: #5ad9ae;
+  --accent-ink: #04150f;
+  --accent-soft: color-mix(in srgb, var(--accent) 13%, transparent);
+  --focus: #6da7ec;
+  --shadow: 0 1px 2px rgba(0, 0, 0, 0.35);
+  --shadow-lg: 0 16px 40px rgba(0, 0, 0, 0.5), 0 2px 8px rgba(0, 0, 0, 0.35);
+  --rail: #070e15;
+  --rail-2: #0e1923;
+  --rail-line: #172634;
+  --map-bg: #0e1822;
+  --sig-households: #1fa197;
+  --sig-pounds: #d17a24;
+  --sig-individuals: #8079ec;
+  --seq-1: #184f95;
+  --seq-2: #256abf;
+  --seq-3: #3987e5;
+  --seq-4: #6da7ec;
+  --seq-5: #b7d3f6;
+  --div-neg: #3987e5;
+  --div-mid: #383835;
+  --div-pos: #e66767;
+  --nodata: #26313b;
+  --good-text: #0ca30c;
+  --warning-text: #fab219;
+  --serious-text: #ec835a;
+  --critical-text: #ff7b7b;
+  --p-n: #3987e5;
+  --p-s: #d95926;
+  --p-t: #199e70;
+  --p-m: #c98500;
+  --p-v: #d55181;
+  --age-children: #3987e5;
+  --age-adults: #199e70;
+  --age-seniors: #c98500;
+}
+
+@theme inline {
+  --color-paper: var(--paper);
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-surface-3: var(--surface-3);
+  --color-ink: var(--ink);
+  --color-ink-2: var(--ink-2);
+  --color-muted: var(--muted);
+  --color-line: var(--line);
+  --color-line-strong: var(--line-strong);
+  --color-green: var(--green);
+  --color-deep: var(--deep);
+  --color-lime: var(--lime);
+  --color-accent: var(--accent);
+  --color-rail: var(--rail);
+  --font-sans: "Inter", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --radius-card: 12px;
+}
+
+html,
+body {
+  background: var(--paper);
+  color: var(--ink);
+}
+
+body {
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  font-feature-settings: "cv11", "ss01";
+}
+
+:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+
+.tabular {
+  font-variant-numeric: tabular-nums;
+}
+
+/* Thin scrollbars inside panels. */
+.fb-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: var(--line-strong) transparent;
+}
+
+/* Range inputs in the accent color. */
+input[type="range"] {
+  accent-color: var(--accent);
+}
+input[type="checkbox"],
+input[type="radio"] {
+  accent-color: var(--accent);
+}
+
+.prose-fb {
+  line-height: 1.6;
+  color: var(--ink);
+}
+.prose-fb h1,
+.prose-fb h2,
+.prose-fb h3 {
+  font-weight: 650;
+  margin: 1.4em 0 0.5em;
+  line-height: 1.25;
+}
+.prose-fb h2 {
+  font-size: 1.25rem;
+}
+.prose-fb h3 {
+  font-size: 1.05rem;
+}
+.prose-fb p {
+  margin: 0.6em 0;
+}
+.prose-fb ul,
+.prose-fb ol {
+  margin: 0.5em 0 0.5em 1.4em;
+}
+.prose-fb ul {
+  list-style: disc;
+}
+.prose-fb ol {
+  list-style: decimal;
+}
+.prose-fb li {
+  margin: 0.2em 0;
+}
+.prose-fb a {
+  color: var(--accent);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.prose-fb code {
+  font-size: 0.85em;
+  background: var(--surface-2);
+  padding: 0.1em 0.35em;
+  border-radius: 4px;
+}
+.prose-fb table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.85rem;
+  margin: 0.8em 0;
+  display: block;
+  overflow-x: auto;
+  font-variant-numeric: tabular-nums;
+}
+.prose-fb th,
+.prose-fb td {
+  border-bottom: 1px solid var(--line);
+  padding: 0.35em 0.6em;
+  text-align: left;
+  white-space: nowrap;
+}
+.prose-fb th {
+  color: var(--ink-2);
+  font-weight: 600;
+}
+.prose-fb strong {
+  font-weight: 650;
+}
+.prose-fb blockquote {
+  border-left: 3px solid var(--line);
+  padding-left: 0.8em;
+  color: var(--ink-2);
+}
+
+/* ---------- Map (Leaflet) ---------- */
+.fb-map.leaflet-container {
+  background: var(--map-bg);
+  font-family: var(--font-sans);
+  outline: none;
+}
+.fb-map .leaflet-control-zoom {
+  border: 1px solid var(--line) !important;
+  border-radius: 10px !important;
+  overflow: hidden;
+  box-shadow: var(--shadow-lg) !important;
+}
+.fb-map .leaflet-control-zoom a {
+  background: var(--glass) !important;
+  color: var(--ink) !important;
+  border-color: var(--line) !important;
+  backdrop-filter: blur(8px);
+  width: 32px !important;
+  height: 32px !important;
+  line-height: 30px !important;
+}
+.fb-map .leaflet-control-zoom a:hover {
+  background: var(--surface-2) !important;
+}
+.fb-map .leaflet-control-attribution {
+  background: color-mix(in srgb, var(--surface) 70%, transparent) !important;
+  color: var(--muted) !important;
+  font-size: 10px;
+  border-radius: 6px 0 0 0;
+}
+.fb-map .leaflet-control-attribution a {
+  color: var(--ink-2) !important;
+}
+.fb-map path.leaflet-interactive:focus {
+  outline: none;
+}
+.fb-map .fb-hatch {
+  fill: url(#fb-hatch) !important;
+  fill-opacity: 1 !important;
+}
+.fb-map.fb-placing,
+.fb-map.fb-placing path.leaflet-interactive {
+  cursor: crosshair !important;
+}
+.fb-pin {
+  background: none;
+  border: none;
+}
+.fb-pin-site {
+  width: 30px;
+  height: 30px;
+  border-radius: 50% 50% 50% 0;
+  transform: rotate(-45deg);
+  background: var(--accent);
+  border: 3px solid #fff;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.45);
+  display: grid;
+  place-items: center;
+}
+.fb-pin-site > span {
+  transform: rotate(45deg);
+  color: var(--accent-ink);
+  font-weight: 800;
+  font-size: 12px;
+}
+.fb-pin-candidate {
+  width: 26px;
+  height: 26px;
+  border-radius: 999px;
+  background: #fff;
+  color: #0f1b2a;
+  border: 2px solid #0f1b2a;
+  display: grid;
+  place-items: center;
+  font-weight: 800;
+  font-size: 12px;
+  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.4);
+}
+.fb-pin-candidate.is-active {
+  background: var(--accent);
+  color: var(--accent-ink);
+  border-color: #fff;
+}
+.fb-pin-count {
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--lime) 92%, transparent);
+  color: #143f35;
+  border: 1.5px solid #143f35;
+  display: grid;
+  place-items: center;
+  font-weight: 700;
+  font-size: 11px;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
+}
+
+@keyframes fb-pulse {
+  0% {
+    transform: scale(0.6);
+    opacity: 0.7;
+  }
+  100% {
+    transform: scale(2.2);
+    opacity: 0;
+  }
+}
+.fb-pulse {
+  position: absolute;
+  inset: 0;
+  border-radius: 999px;
+  background: var(--accent);
+  animation: fb-pulse 1.8s ease-out infinite;
+  pointer-events: none;
+}
+
+@keyframes fb-fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+.fb-fade-in {
+  animation: fb-fade-in 0.18s ease-out;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * {
+    transition: none !important;
+    animation: none !important;
+  }
+}
+
+@media print {
+  aside,
+  .no-print {
+    display: none !important;
+  }
+}
+.fb-map .fb-reset {
+  border: 1px solid var(--line) !important;
+  border-radius: 10px !important;
+  overflow: hidden;
+  box-shadow: var(--shadow-lg) !important;
+}
+.fb-map .fb-reset a {
+  background: var(--glass) !important;
+  color: var(--ink) !important;
+  width: 32px !important;
+  height: 32px !important;
+  line-height: 30px !important;
+  text-align: center;
+  backdrop-filter: blur(8px);
+}
+/* Esri's dark canvas is mid-gray; darken it toward the near-black BEI basemap so colors pop. */
+.fb-map.fb-tiles-dark .leaflet-tile-pane {
+  filter: brightness(0.55) contrast(1.12) saturate(0.7);
+}
+.fb-map.fb-tiles-dark .leaflet-labels-pane {
+  opacity: 0.8;
+}

@@ -11,7 +11,7 @@ This repository contains the public [Triaggent Consulting website](https://triag
 | `portfolio/gradient-descent/` | Static build of the [Gradient Descent interactive course](https://github.com/Jacob19999/gradient-descent), served at `/portfolio/gradient-descent/`. |
 | `portfolio/mission-control/` | Static, read-only replay of the [EDF mission-control console](https://github.com/Jacob19999/tvc-retro-propulsion) with recorded Isaac Sim landing and hover flights, served at `/portfolio/mission-control/`. See [portfolio/README.md](portfolio/README.md). |
 | `portfolio/beyond-wrvus/` | Static, public-data copy of the Beyond wRVUs value platform (gynecologic oncology program value), served at `/portfolio/beyond-wrvus/`. See [portfolio/README.md](portfolio/README.md). The licensed MarketView atlas module is not included. |
-| `portfolio/foodbridge/` | Static build of FoodBridge, an operations app for Minnesota hunger-relief staff (county need-versus-activity review, supply scenarios, follow-ups), served at `/portfolio/foodbridge/`. See [portfolio/README.md](portfolio/README.md). |
+| `apps/foodbridge/` | Next.js FoodBridge app (manager workspace, shelf portal, findings). Deployed as its own Vercel project with root directory `apps/foodbridge`. County and tract aggregates only. |
 | `sgo/` | Password-protected PHP version of the SGO Market Atlas. `sgo/platform.php` is the Beyond wRVUs value platform (public-data dashboards, scenario model, and a local-file atlas); it shares the atlas login and reads its data from encrypted `sgo/data/platform_*.json.enc`. |
 | `sgo-next/` | Separate Next.js version of the atlas; see its [README](sgo-next/README.md). |
 

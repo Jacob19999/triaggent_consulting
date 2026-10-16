@@ -29,12 +29,12 @@ MarketView layer; this copy omits that module and any internal paths. To refresh
 `python3 build_platform.py --public` in the BData repo's `women opportunity/platform/` folder, then
 replace this directory. Keep `index.html` and `vendor/` together.
 
-`foodbridge/` is the static FoodBridge operations app, served at `/portfolio/foodbridge/`. It is
-built by `uv run python -m mi.operations` in the Maverick Intelligence MinneMUDAC 2026 repository
-(source `dashboard/web/`, output `outputs/operations/`). Only county-level aggregates are bundled:
-no site identifiers, census blocks or licensed Map the Meal Gap values. Staff actions and scenarios
-stay in the viewer's browser storage. To refresh it, rebuild there and copy `index.html`, `app.css`,
-`app.js`, `core.js` and `data.js` into this directory.
+The hosted FoodBridge app is the Next.js project at `apps/foodbridge/` (manager workspace,
+shelf portal, and findings). It ships county and tract aggregates only: no site identifiers,
+census blocks, or licensed Map the Meal Gap values. Rebuild the bundle in the Maverick
+Intelligence repository with `uv run python -m mi.foodbridge_bundle`, copy `data/research.json`
+and `public/data/` into `apps/foodbridge/`, and redeploy that Vercel project.
+`portfolio/foodbridge/` redirects to the hosted app.
 
 The other portfolio cards link to separate sites:
 
