@@ -16,7 +16,6 @@
     "privacy": "node scripts/privacy-scan.mjs"
   },
   "dependencies": {
-    "@anthropic-ai/sdk": "0.131.0",
     "@supabase/ssr": "0.12.7",
     "@supabase/supabase-js": "2.117.2",
     "leaflet": "1.9.4",

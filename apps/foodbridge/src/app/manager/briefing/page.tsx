@@ -29,7 +29,7 @@ export default function BriefingPage() {
       <PageHeader
         eyebrow="Agentic briefing"
         title="Policy and operations briefing"
-        description="An AI agent looks up the dated policy timeline, current alerts, county research and the FEI, then writes a cited briefing with actions for this week. It explains and retrieves; it never computes a number, and every figure names its source."
+        description="Google Gemini looks up the dated policy timeline, current alerts, county research and the FEI, then writes a cited briefing with actions for this week. It explains and retrieves; it never computes a number, and every figure names its source."
       />
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-[340px_1fr]">
         <Card title="What do you need?">

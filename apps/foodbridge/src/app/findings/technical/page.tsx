@@ -49,7 +49,7 @@ const SECTIONS = [
   },
   {
     title: "AI briefing agent",
-    body: "Server-side tool use with Claude. Tools are read-only: the policy timeline, county profiles and rankings, research findings, the FEI method, and the caller's own alerts and network totals. The system prompt forbids computing numbers, requires a source after each figure, and applies the team's wording rules (D-052, D-053). Without an API key, or if the model declines, the same facts are returned as an offline briefing.",
+    body: "Server-side function calling with Google Gemini. Tools are read-only: the policy timeline, county profiles and rankings, research findings, the FEI method, and the caller's own alerts and network totals. The system prompt forbids computing numbers, requires a source after each figure, and applies the team's wording rules (D-052, D-053). Without an API key, or if the model declines, the same facts are returned as an offline briefing.",
   },
   {
     title: "Data and privacy contract",
@@ -57,7 +57,7 @@ const SECTIONS = [
   },
   {
     title: "Stack and deployment",
-    body: "Next.js 15 (App Router, TypeScript) on Vercel; Supabase Postgres + Auth with row-level security; Anthropic API for the agent (server only). Demo mode needs no services: synthetic shelves live in the browser. Security headers (CSP, nosniff, frame-ancestors), noindex by default, per-IP and daily limits on the agent route.",
+    body: "Next.js 15 (App Router, TypeScript) on Vercel; Supabase Postgres + Auth with row-level security; Google Gemini API for the agent (server only). Demo mode needs no services: synthetic shelves live in the browser. Security headers (CSP, nosniff, frame-ancestors), noindex by default, per-IP and daily limits on the agent route.",
   },
 ];
 
@@ -82,9 +82,9 @@ export default function Technical() {
             <Box x={10} y={180} w={220} h={120} title="Public sources" lines={["Census ACS, 2020 PL, TIGER", "USDA LILA / SRAM, CDC SVI", "BLS CPI, DCYF SNAP", "policy timeline (primary)"]} />
             <Box x={290} y={95} w={210} h={130} title="mi.foodbridge_bundle" lines={["column allowlist", "FEI adapter (pillar letters)", "privacy scan", "→ data/research.json", "→ public/data/fei-tracts.json"]} tone="deep" />
             <Box x={560} y={20} w={200} h={130} title="Next.js app on Vercel" lines={["Manager workspace", "Food shelf portal", "Findings & presentation", "forecast · alerts · scenarios", "run in the browser"]} />
-            <Box x={560} y={180} w={200} h={120} title="/api/agent (server)" lines={["Claude tool use", "read-only retrieval tools", "cited briefing", "offline fallback"]} />
+            <Box x={560} y={180} w={200} h={120} title="/api/agent (server)" lines={["Gemini function calling", "read-only retrieval tools", "cited briefing", "offline fallback"]} />
             <Box x={820} y={20} w={150} h={130} title="Supabase" lines={["Postgres + Auth", "row-level security", "shelves, reports,", "requests, alerts,", "scenarios"]} />
-            <Box x={820} y={180} w={150} h={120} title="Anthropic API" lines={["model: Claude", "key server-side", "refusal fallback"]} />
+            <Box x={820} y={180} w={150} h={120} title="Google Gemini API" lines={["model: Gemini Flash", "key server-side", "refusal fallback"]} />
             <Arrow x1={230} y1={80} x2={290} y2={140} label="aggregates" />
             <Arrow x1={230} y1={240} x2={290} y2={185} />
             <Arrow x1={500} y1={140} x2={560} y2={90} label="static" />

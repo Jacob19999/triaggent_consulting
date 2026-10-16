@@ -1,9 +1,9 @@
-import Anthropic from "@anthropic-ai/sdk";
 import { NextResponse, type NextRequest } from "next/server";
 import { z } from "zod";
 import { offlineBriefing } from "@/lib/agent/fallback";
 import { MODE_PROMPTS } from "@/lib/agent/prompt";
 import { runAgent } from "@/lib/agent/run";
+import { createGeminiClient, DEFAULT_AI_MODEL, FALLBACK_AI_MODEL, GeminiAPIError } from "@/lib/agent/gemini";
 import { Snapshot } from "@/lib/agent/tools";
 import { supabaseConfigured } from "@/lib/config";
 import { currentProfile } from "@/lib/supabase/server";
@@ -59,13 +59,13 @@ export async function POST(req: NextRequest) {
       toolCalls: [],
     });
 
-  if (!process.env.ANTHROPIC_API_KEY) return offline();
+  const apiKey = process.env.GEMINI_API_KEY?.trim();
+  if (!apiKey) return offline();
   const ip = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? "local";
   const limit = limited(ip);
   if (limit) return NextResponse.json({ error: limit }, { status: 429 });
 
-  const client = new Anthropic();
-  const model = process.env.FOODBRIDGE_AI_MODEL ?? "claude-opus-5-5";
+  const model = process.env.FOODBRIDGE_AI_MODEL?.trim() || DEFAULT_AI_MODEL;
   const task = [
     MODE_PROMPTS[body.mode],
     `As-of month: ${body.snapshot.asOf}. Workspace: ${body.snapshot.workspace}.`,
@@ -76,9 +76,23 @@ export async function POST(req: NextRequest) {
     .join("\n");
 
   try {
-    const result = await runAgent((params) => client.beta.messages.create(params), task, body.snapshot, model);
+    const deadline = Date.now() + 95_000;
+    const generate = (name: string) => runAgent(createGeminiClient(apiKey, name, fetch, deadline), task, body.snapshot, name);
+    let result;
+    let usedFallback = false;
+    try {
+      result = await generate(model);
+    } catch (e) {
+      if (!(e instanceof GeminiAPIError) || e.status !== 503 || model !== DEFAULT_AI_MODEL) throw e;
+      // Restart the conversation: signatures from one model cannot be replayed to another.
+      result = await generate(FALLBACK_AI_MODEL);
+      usedFallback = true;
+    }
     if (result.status === "ok" && result.markdown)
-      return NextResponse.json({ mode: "ai", model: result.model, markdown: result.markdown, toolCalls: result.toolCalls });
+      return NextResponse.json({
+        mode: "ai", model: result.model, markdown: result.markdown, toolCalls: result.toolCalls,
+        ...(usedFallback ? { note: "Gemini Flash is busy; this summary uses Gemini Flash-Lite." } : {}),
+      });
     return NextResponse.json({
       mode: "offline",
       markdown: offlineBriefing(body.mode, body.snapshot, body.county),
@@ -89,13 +103,17 @@ export async function POST(req: NextRequest) {
           : "The agent did not finish; showing the offline briefing.",
     });
   } catch (e) {
-    const status = e instanceof Anthropic.APIError ? e.status : 500;
-    console.error("agent error", status, e instanceof Error ? e.message : e);
+    const status = e instanceof GeminiAPIError ? e.status : 500;
+    console.error("Gemini briefing failed", { status });
     return NextResponse.json({
       mode: "offline",
       markdown: offlineBriefing(body.mode, body.snapshot, body.county),
       toolCalls: [],
-      note: status === 429 ? "The AI service is busy; showing the offline briefing." : "The AI service is unavailable; showing the offline briefing.",
+      note: status === 429
+        ? "Google Gemini's request limit was reached; showing the offline briefing. Try again later."
+        : status === 503
+          ? "Google Gemini is experiencing high demand; showing the offline briefing. Try again shortly."
+          : "Google Gemini is unavailable; showing the offline briefing.",
     });
   }
 }

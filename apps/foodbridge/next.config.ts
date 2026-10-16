@@ -5,7 +5,7 @@ const supabase = process.env.NEXT_PUBLIC_SUPABASE_URL ?? "";
 const supabaseHost = supabase ? new URL(supabase).host : "";
 
 // Next.js hydration needs inline scripts; everything else is locked to this origin and
-// Supabase. The Anthropic API is called server-side only, so it is not in connect-src.
+// Supabase. The Google Gemini API is called server-side only, so it is not in connect-src.
 // Map basemap tiles come from Esri's public basemap service (images only; a request carries
 // tile coordinates, never app data). Without them the maps still draw their colors.
 const csp = [

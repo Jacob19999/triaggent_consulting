@@ -1,8 +1,34 @@
-import Anthropic from "@anthropic-ai/sdk";
 import { SYSTEM_PROMPT } from "./prompt";
 import { runTool, TOOL_DEFS, type SnapshotT } from "./tools";
 
-type Create = (params: Anthropic.Beta.Messages.MessageCreateParamsNonStreaming) => Promise<Anthropic.Beta.Messages.BetaMessage>;
+export interface GeminiPart {
+  text?: string;
+  thought?: boolean;
+  thoughtSignature?: string;
+  functionCall?: { name: string; args?: Record<string, unknown>; id?: string };
+  functionResponse?: { name: string; response: Record<string, unknown>; id?: string };
+}
+
+export interface GeminiContent {
+  role: "user" | "model";
+  parts: GeminiPart[];
+}
+
+export interface GeminiRequest {
+  systemInstruction: { parts: { text: string }[] };
+  contents: GeminiContent[];
+  tools: { functionDeclarations: { name: string; description: string; parametersJsonSchema: unknown }[] }[];
+  toolConfig: { functionCallingConfig: { mode: "ANY" | "AUTO" } };
+  generationConfig: { maxOutputTokens: number; temperature: number };
+}
+
+export interface GeminiResponse {
+  modelVersion?: string;
+  promptFeedback?: { blockReason?: string };
+  candidates?: { content?: GeminiContent; finishReason?: string }[];
+}
+
+export type GenerateContent = (params: GeminiRequest) => Promise<GeminiResponse>;
 
 export interface AgentOutcome {
   status: "ok" | "refusal" | "steps";
@@ -11,48 +37,45 @@ export interface AgentOutcome {
   toolCalls: { name: string; input: unknown }[];
 }
 
-/** Manual tool-use loop. `create` is injectable so the loop can be tested without the API. */
-export async function runAgent(create: Create, task: string, snapshot: SnapshotT, model: string, maxTurns = 8): Promise<AgentOutcome> {
-  const messages: Anthropic.Beta.Messages.BetaMessageParam[] = [{ role: "user", content: task }];
+/** Replay model parts intact, including thought signatures and function-call IDs.
+ * `create` is injectable so the loop can be tested without the Google API.
+ */
+export async function runAgent(create: GenerateContent, task: string, snapshot: SnapshotT, model: string, maxTurns = 8): Promise<AgentOutcome> {
+  const contents: GeminiContent[] = [{ role: "user", parts: [{ text: task }] }];
   const toolCalls: AgentOutcome["toolCalls"] = [];
   for (let turn = 0; turn < maxTurns; turn++) {
     const response = await create({
-      model,
-      max_tokens: 16000,
-      betas: ["server-side-fallback-2026-07-01"],
-      fallbacks: "default",
-      thinking: { type: "adaptive" },
-      output_config: { effort: "medium" },
-      system: [{ type: "text", text: SYSTEM_PROMPT, cache_control: { type: "ephemeral" } }],
-      tools: TOOL_DEFS,
-      messages,
+      systemInstruction: { parts: [{ text: SYSTEM_PROMPT }] },
+      tools: [{ functionDeclarations: TOOL_DEFS.map((t) => ({ name: t.name, description: t.description, parametersJsonSchema: t.input_schema })) }],
+      // Retrieve evidence before writing any summary.
+      toolConfig: { functionCallingConfig: { mode: turn === 0 ? "ANY" : "AUTO" } },
+      generationConfig: { maxOutputTokens: 8192, temperature: 0.2 },
+      contents,
     });
-    if (response.stop_reason === "refusal") return { status: "refusal", markdown: "", toolCalls };
-    if (response.stop_reason === "pause_turn") {
-      messages.push({ role: "assistant", content: response.content });
-      continue;
+    const candidate = response.candidates?.[0];
+    if (response.promptFeedback?.blockReason || ["SAFETY", "RECITATION", "BLOCKLIST", "PROHIBITED_CONTENT", "SPII"].includes(candidate?.finishReason ?? "")) {
+      return { status: "refusal", markdown: "", toolCalls };
     }
-    const uses = response.content.filter((b): b is Anthropic.Beta.Messages.BetaToolUseBlock => b.type === "tool_use");
-    if (response.stop_reason !== "tool_use" || uses.length === 0) {
-      const markdown = response.content
-        .filter((b): b is Anthropic.Beta.Messages.BetaTextBlock => b.type === "text")
-        .map((b) => b.text)
-        .join("\n")
-        .trim();
-      return { status: "ok", markdown, model: response.model, toolCalls };
+    // Never show a truncated or malformed answer as a completed briefing.
+    if (!candidate?.content || candidate.finishReason !== "STOP") return { status: "steps", markdown: "", toolCalls };
+    const parts = candidate.content.parts;
+    const uses = parts.flatMap((p) => p.functionCall ? [p.functionCall] : []);
+    if (!uses.length) {
+      const markdown = parts.filter((p) => !p.thought).map((p) => p.text ?? "").join("\n").trim();
+      return { status: toolCalls.length && markdown ? "ok" : "steps", markdown, model: response.modelVersion ?? model, toolCalls };
     }
-    messages.push({ role: "assistant", content: response.content });
-    // All results for this turn go back in one user message (parallel tool use).
-    const results: Anthropic.Beta.Messages.BetaToolResultBlockParam[] = uses.map((u) => {
-      toolCalls.push({ name: u.name, input: u.input });
+    contents.push(candidate.content);
+    const results: GeminiPart[] = uses.map((u) => {
+      toolCalls.push({ name: u.name, input: u.args ?? {} });
+      let response: Record<string, unknown>;
       try {
-        const out = runTool(u.name, (u.input ?? {}) as Record<string, unknown>, snapshot);
-        return { type: "tool_result", tool_use_id: u.id, content: JSON.stringify(out) };
-      } catch (e) {
-        return { type: "tool_result", tool_use_id: u.id, is_error: true, content: String(e) };
+        response = { result: runTool(u.name, u.args ?? {}, snapshot) };
+      } catch {
+        response = { error: "The requested lookup could not be completed." };
       }
+      return { functionResponse: { name: u.name, response, ...(u.id ? { id: u.id } : {}) } };
     });
-    messages.push({ role: "user", content: results });
+    contents.push({ role: "user", parts: results });
   }
   return { status: "steps", markdown: "", toolCalls };
 }

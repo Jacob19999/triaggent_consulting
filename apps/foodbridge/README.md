@@ -65,7 +65,7 @@ the Q6 need percentile, labelled as a placeholder (FoodBridge never computes its
 
 ## Deploy on Vercel
 
-1. Vercel → **Add New Project** → import `Jacob19999/maverick_intelligence_mnsu`.
+1. Use the existing `jacob19999s-projects/foodbridge` project, built from `Jacob19999/triaggent_consulting`. Never deploy the private research repository (D-061).
 2. **Root Directory:** `apps/foodbridge`. Framework preset: Next.js. Node 20 or later.
 3. **Environment variables** (Production and Preview):
 
@@ -75,14 +75,14 @@ the Q6 need percentile, labelled as a placeholder (FoodBridge never computes its
    | `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | Live workspace (RLS applies) | yes (public) |
    | `SUPABASE_SECRET_KEY` | Granting shelf access (`/api/admin/invite`) | **no, server only** |
    | `FOODBRIDGE_EMAIL_ONLY_LOGIN` | Optional `true`: immediate prototype sign-in and manager access for new accounts | no |
-   | `ANTHROPIC_API_KEY` | AI briefing (`/api/agent`); offline briefing without it | **no, server only** |
-   | `FOODBRIDGE_AI_MODEL` | Optional, default `claude-opus-5-5` | no |
+   | `GEMINI_API_KEY` | AI briefing (`/api/agent`); offline briefing without it | **no, server only** |
+   | `FOODBRIDGE_AI_MODEL` | Optional, default `gemini-flash-latest` | no |
    | `FOODBRIDGE_AI_REQUIRE_AUTH` | Optional `true`: only signed-in users may call the agent | no |
    | `FOODBRIDGE_AI_PER_IP`, `FOODBRIDGE_AI_DAILY_LIMIT` | Optional limits (default 8 per 10 min, 300 per day) | no |
    | `NEXT_PUBLIC_FOODBRIDGE_MODE` | Optional `demo`: hide the live workspace | yes |
    | `FOODBRIDGE_ALLOW_INDEXING` | Optional `true`: allow search indexing (off by default) | no |
 
-4. Deploy. `/api/health` reports the bundle version and which services are configured.
+4. Deploy. `/api/health` reports the bundle version, AI provider/model, and which services are configured. Gemini uses the direct Google `generateContent` API with read-only function calls. When the default Flash alias returns HTTP 503, the conversation restarts once on `gemini-flash-lite-latest`, and the summary identifies the fallback model; quota, overload, timeout, or missing-key failures return the sourced offline briefing. Free-tier quotas are controlled by Google and are not guaranteed by this app. Keep `GEMINI_API_KEY` server-only (a Vercel Secret), never in a `NEXT_PUBLIC_` variable.
 
 Deploying is publishing (CLAUDE.md): the URL is public unless you turn on Vercel
 Deployment Protection. Pages send `noindex` by default.
@@ -120,7 +120,7 @@ Meal Gap tables never go there.
 | --- | --- | --- |
 | Vercel | Required for hosting | Next.js app and API routes |
 | Supabase | Required for the live workspace | Postgres, magic-link auth, row-level security |
-| Anthropic API | Optional | AI briefing; without a key the agent returns an offline, fact-only briefing |
+| Google Gemini API | Optional | AI briefing; without a key the agent returns an offline, fact-only briefing |
 | Upstash Redis or Vercel KV | Recommended for a public URL | Durable rate limits on `/api/agent` (built-in limits are per instance) |
 | Resend + Vercel Cron | Optional | Email alert digests to shelves |
 | Sentry or Vercel Observability | Optional | Error monitoring |

@@ -1,5 +1,5 @@
 // Public configuration. Only NEXT_PUBLIC_* values reach the browser; the Supabase secret
-// key and the Anthropic key are read in server code only (src/lib/supabase/admin.ts,
+// key and the Gemini key are read in server code only (src/lib/supabase/admin.ts,
 // src/app/api/*).
 
 export const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL ?? "";

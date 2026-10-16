@@ -15,7 +15,7 @@ export function offlineBriefing(mode: string, snap: SnapshotT, county?: string):
   const alerts = (runTool("get_alerts", { min_severity: "warning" }, snap) as Alerts).alerts;
   lines.push(`## Headline`);
   lines.push(
-    `Offline briefing for ${monthLabel(snap.asOf, "long")} (no AI model is configured, so this lists the facts without commentary).`,
+    `Offline briefing for ${monthLabel(snap.asOf, "long")} (retrieved facts; no AI-generated commentary).`,
   );
   if (mode === "county" && county) {
     const p = runTool("get_county_profile", { county }, snap) as Record<string, unknown>;
