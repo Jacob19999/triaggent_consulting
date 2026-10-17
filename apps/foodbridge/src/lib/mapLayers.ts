@@ -3,7 +3,7 @@
 // they are switched off at tract level instead.
 
 import { fmt } from "./format";
-import { PILLARS } from "./pillars";
+import { PILLARS, DIMENSIONS, feiFormula } from "./pillars";
 import type { RampId } from "./ramps";
 import { countiesByFips, equityValue, feiReady, research } from "./research";
 import type { County, FeiTract, Pillar, Tract } from "./types";
@@ -70,7 +70,7 @@ const pillarLayers: LayerDef[] = feiReady
       format: (v: number) => fmt.num(v, 2),
       low: "Fewer barriers",
       high: "More barriers",
-      note: `${p.what} Weight ${Math.round(p.weight * 100)}%.`,
+      note: `${p.what} Weight ${Math.round(p.weight * 100)}%, ${DIMENSIONS.need.includes(p.key) ? "need" : "access"} side.`,
       county: (c: County) => (c.fei?.[p.key as Pillar] as number | null | undefined) ?? null,
       tract: (t: TractRow) => (t[p.key as Pillar] as number | null | undefined) ?? null,
     }))
@@ -87,7 +87,7 @@ export const LAYERS: LayerDef[] = [
     low: "Fewer barriers",
     high: "More barriers",
     note: feiReady
-      ? "FEI = 100 × (0.25·N + 0.25·S + 0.20·T + 0.15·M + 0.15·V). A screening index, not a count of unmet people."
+      ? `${feiFormula()}. A screening index, not a count of unmet people.`
       : "Placeholder until FEI lands: Q6 need percentile (0–100).",
     county: equityValue,
     tract: (t) => t.fei ?? null,

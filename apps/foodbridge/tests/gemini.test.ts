@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 vi.mock("server-only", () => ({}));
-import { createGeminiClient, GeminiAPIError } from "@/lib/agent/gemini";
+import { createGeminiClient, GeminiAPIError, resolveAiModel } from "@/lib/agent/gemini";
 import { POST } from "@/app/api/agent/route";
 import { NextRequest } from "next/server";
 import type { GeminiRequest } from "@/lib/agent/run";
@@ -30,6 +30,10 @@ describe("Gemini server client", () => {
   it("rejects a non-Gemini model before sending credentials", () => {
     expect(() => createGeminiClient("secret", "../other-host")).toThrow(GeminiAPIError);
   });
+  it("reports an aborted request as a timeout", async () => {
+    const fetcher = vi.fn<typeof fetch>().mockRejectedValue(Object.assign(new Error("The operation was aborted"), { name: "TimeoutError" }));
+    await expect(createGeminiClient("test-secret", "gemini-3.5-flash-lite", fetcher)(request)).rejects.toMatchObject({ status: 504, code: "TIMEOUT" });
+  });
   it("drops provider errors that could echo secrets", async () => {
     const fetcher = vi.fn<typeof fetch>().mockResolvedValue(new Response("test-secret", { status: 429 }));
     try {
@@ -48,6 +52,7 @@ describe("Gemini briefing route", () => {
     vi.stubEnv("GEMINI_API_KEY", "route-test-secret");
     vi.stubEnv("FOODBRIDGE_AI_MODEL", "gemini-flash-latest");
     vi.stubEnv("FOODBRIDGE_AI_REQUIRE_AUTH", "false");
+    expect(resolveAiModel()).toBe("gemini-3.5-flash-lite");
     const fetcher = vi.fn<typeof fetch>()
       .mockResolvedValueOnce(Response.json({ candidates: [{ finishReason: "STOP", content: { role: "model", parts: [{ functionCall: { name: "get_network_summary", args: {} } }] } }] }))
       .mockResolvedValueOnce(Response.json({ modelVersion: "gemini-test", candidates: [{ finishReason: "STOP", content: { role: "model", parts: [{ text: "Sourced summary [q4_state_month.csv]." }] } }] }))
@@ -58,6 +63,7 @@ describe("Gemini briefing route", () => {
       const result = await (await post()).json();
       expect(result.mode).toBe("ai");
       expect(result.model).toBe("gemini-test");
+      expect(String(fetcher.mock.calls[0][0])).toContain("gemini-3.5-flash-lite");
       const fallback = await (await post()).json();
       expect(fallback.mode).toBe("offline");
       expect(fallback.note).toContain("request limit");
@@ -67,22 +73,32 @@ describe("Gemini briefing route", () => {
       log.mockRestore(); vi.unstubAllGlobals(); vi.unstubAllEnvs();
     }
   });
-  it("restarts on Flash overload using Gemini 3.5 Flash Lite and identifies the fallback", async () => {
+  it("restarts a timed-out or overloaded pinned model on Gemini 3.5 Flash Lite", async () => {
     vi.stubEnv("GEMINI_API_KEY", "route-test-secret");
-    vi.stubEnv("FOODBRIDGE_AI_MODEL", "gemini-flash-latest");
+    vi.stubEnv("FOODBRIDGE_AI_MODEL", "gemini-2.5-flash");
     vi.stubEnv("FOODBRIDGE_AI_REQUIRE_AUTH", "false");
+    const tool = () => Response.json({ candidates: [{ finishReason: "STOP", content: { role: "model", parts: [{ functionCall: { name: "get_network_summary", args: {} } }] } }] });
+    const done = () => Response.json({ modelVersion: "gemini-flash-lite-test", candidates: [{ finishReason: "STOP", content: { role: "model", parts: [{ text: "Sourced fallback summary." }] } }] });
     const fetcher = vi.fn<typeof fetch>()
+      .mockRejectedValueOnce(Object.assign(new Error("The operation was aborted"), { name: "TimeoutError" }))
+      .mockResolvedValueOnce(tool())
+      .mockResolvedValueOnce(done())
       .mockResolvedValueOnce(new Response("Busy", { status: 503 }))
-      .mockResolvedValueOnce(Response.json({ candidates: [{ finishReason: "STOP", content: { role: "model", parts: [{ functionCall: { name: "get_network_summary", args: {} } }] } }] }))
-      .mockResolvedValueOnce(Response.json({ modelVersion: "gemini-flash-lite-test", candidates: [{ finishReason: "STOP", content: { role: "model", parts: [{ text: "Sourced fallback summary." }] } }] }));
+      .mockResolvedValueOnce(tool())
+      .mockResolvedValueOnce(done());
     vi.stubGlobal("fetch", fetcher);
     try {
-      const result = await (await post()).json();
-      expect(result.mode).toBe("ai");
-      expect(result.model).toBe("gemini-flash-lite-test");
-      expect(result.note).toContain("Gemini 3.5 Flash Lite");
+      const timedOut = await (await post()).json();
+      expect(timedOut.mode).toBe("ai");
+      expect(timedOut.model).toBe("gemini-flash-lite-test");
+      expect(timedOut.note).toContain("Gemini 3.5 Flash Lite");
+      expect(String(fetcher.mock.calls[0][0])).toContain("gemini-2.5-flash");
       expect(String(fetcher.mock.calls[1][0])).toContain("gemini-3.5-flash-lite");
       expect(JSON.parse(String(fetcher.mock.calls[1][1]?.body)).contents).toHaveLength(1);
+      const overloaded = await (await post()).json();
+      expect(overloaded.mode).toBe("ai");
+      expect(String(fetcher.mock.calls[3][0])).toContain("gemini-2.5-flash");
+      expect(String(fetcher.mock.calls[4][0])).toContain("gemini-3.5-flash-lite");
     } finally { vi.unstubAllGlobals(); vi.unstubAllEnvs(); }
   });
   it("keeps live summaries behind sign-in", async () => {

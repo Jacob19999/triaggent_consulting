@@ -230,7 +230,7 @@ export default function ReportPage() {
                 <dd className="text-right text-ink-2">{fmt.pct(after.coverage)}</dd>
               </dl>
               <Link href="/shelf" className="mt-3 inline-block text-[13px] font-medium text-accent underline">
-                See alerts on your dashboard
+                See alerts on the overview
               </Link>
             </Card>
           ) : (
@@ -240,7 +240,12 @@ export default function ReportPage() {
                 <li>Food on hand and receipts let FoodBridge warn you before a stock-out, not after.</li>
                 <li>Turn-aways show demand the shelf could not meet, which visit counts alone hide.</li>
               </ul>
-              <SourceNote>Your report is visible to your network managers. No client names or addresses are collected.</SourceNote>
+              <SourceNote>
+                {shelf?.is_demo
+                  ? "County-network mode: reports are saved in this browser only; no manager sees them."
+                  : "Your report is visible to your network managers."}{" "}
+                No client names or addresses are collected.
+              </SourceNote>
             </Card>
           )}
         </div>

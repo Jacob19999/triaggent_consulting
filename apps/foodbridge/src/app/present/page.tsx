@@ -356,7 +356,7 @@ function TitleSlide() {
       <div className="grid min-h-0 flex-1 grid-cols-[1.15fr_1fr] items-center gap-10">
         <div className="fb-rise">
           <div className="text-[13px] font-semibold uppercase tracking-[0.14em] text-accent">MinneMUDAC 2026 · The Food Group · Graduate team G08</div>
-          <h1 className="mt-4 text-[50px] font-semibold leading-[1.05] tracking-[-0.03em] text-ink">
+          <h1 className="mt-4 text-[50px] font-semibold leading-[1.05] tracking-[-0.03em] text-ink [word-spacing:0.08em]">
             The Food Group can see <Hl>demand</Hl>. It can't see <Hl hot>need</Hl>.
           </h1>
           <p className="mt-4 text-[18px] leading-relaxed text-ink-2">
@@ -424,7 +424,7 @@ function FeiSlide() {
         </>
       }
       monday={{ decision: "Allocation", text: "weigh supply by barriers as well as by visits; visits only show who already gets in." }}
-      method="five pillars, each 0–1 from public data, weighted 25/25/20/15/15 into a 0–100 score"
+      method="five pillars, each 0–1 from public data: need (N 35 · V 15) × access (S 15 · T 20 · M 15), multiplied into a 0–100 score"
       source="mi.fei: 1,501 Census 2020 tracts, 2024 reporting network; no visit counts, SNAP or Map the Meal Gap values enter the score"
     >
       <div className="grid h-full min-h-0 grid-cols-[0.95fr_1.3fr] gap-5">
@@ -485,7 +485,7 @@ function FeiSlide() {
               </>
             ) : (
               <>
-                <b className="text-ink">All five, weighted:</b> one 0–100 score per tract. Red = most barriers.
+                <b className="text-ink">Need × access:</b> one 0–100 score per tract, high only where both are high. Red = most barriers.
               </>
             )
           }

@@ -97,13 +97,13 @@ the Q6 need percentile, labelled as a placeholder (FoodBridge never computes its
    | `SUPABASE_SECRET_KEY` | Granting shelf access (`/api/admin/invite`) | **no, server only** |
    | `FOODBRIDGE_EMAIL_ONLY_LOGIN` | Optional `true`: immediate prototype sign-in and manager access for new accounts | no |
    | `GEMINI_API_KEY` | AI briefing (`/api/agent`); offline briefing without it | **no, server only** |
-   | `FOODBRIDGE_AI_MODEL` | Optional, default `gemini-flash-latest` | no |
+   | `FOODBRIDGE_AI_MODEL` | Optional, default `gemini-3.5-flash-lite`. The alias `gemini-flash-latest` is remapped to this default | no |
    | `FOODBRIDGE_AI_REQUIRE_AUTH` | Optional `true`: only signed-in users may call the agent | no |
    | `FOODBRIDGE_AI_PER_IP`, `FOODBRIDGE_AI_DAILY_LIMIT` | Optional limits (default 8 per 10 min, 300 per day) | no |
    | `NEXT_PUBLIC_FOODBRIDGE_MODE` | Optional `demo`: hide the live workspace | yes |
    | `FOODBRIDGE_ALLOW_INDEXING` | Optional `true`: allow search indexing (off by default) | no |
 
-4. Deploy. `/api/health` reports the bundle version, AI provider/model, and which services are configured. Gemini uses the direct Google `generateContent` API with read-only function calls. When the default Flash alias returns HTTP 503, the conversation restarts once on Gemini 3.5 Flash Lite (`gemini-3.5-flash-lite`), and the summary identifies the fallback model; quota, overload, timeout, or missing-key failures return the sourced offline briefing. Free-tier quotas are controlled by Google and are not guaranteed by this app. Keep `GEMINI_API_KEY` server-only (a Vercel Secret), never in a `NEXT_PUBLIC_` variable.
+4. Deploy. `/api/health` reports the bundle version, AI provider/model, and which services are configured. Gemini uses the direct Google `generateContent` API with read-only function calls. The default model is Gemini 3.5 Flash Lite (`gemini-3.5-flash-lite`). The alias `gemini-flash-latest` currently serves Gemini 3.8 Flash, whose tool turns take about 30 seconds and are aborted into the offline briefing, so that alias is remapped to Flash Lite. A different pinned model that returns HTTP 503 or times out is retried once on Flash Lite, and the summary identifies that fallback; quota or other provider failures return the sourced offline briefing. Free-tier quotas are controlled by Google and are not guaranteed by this app. Keep `GEMINI_API_KEY` server-only (a Vercel Secret), never in a `NEXT_PUBLIC_` variable.
 
 Deploying is publishing (CLAUDE.md). The portal password keeps casual visitors and
 crawlers out; it is not access control for sensitive data, so the bundle still carries

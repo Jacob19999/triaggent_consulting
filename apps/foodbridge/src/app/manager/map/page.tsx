@@ -9,6 +9,7 @@ import { CategoryLegend, GeoMap, GradientLegend, type MapMarker } from "@/compon
 import { DEFAULT_SETTINGS, GeographySwitch, LayerList, OverlayControls, StyleControls, type MapSettings, type OverlayState } from "@/components/map/MapControls";
 import { auditGeoms, useLayerFill, useTractRows } from "@/components/map/useMapData";
 import { Badge, buttonClass, cx, ForecastBadge, Icon, Segmented, Select, SourceNote } from "@/components/ui";
+import { useSiteTypes } from "@/components/useSiteTypes";
 import { monthLabel } from "@/lib/calendar";
 import { fmt } from "@/lib/format";
 import { layerById, type TractRow, type Unit } from "@/lib/mapLayers";
@@ -66,7 +67,8 @@ function Section({ title, children, aside }: { title: ReactNode; children: React
 type Tab = "layers" | "breakdown";
 
 export default function MapExplorer() {
-  const { data } = useData();
+  const { data, session } = useData();
+  const { mix: siteMix } = useSiteTypes();
   const tracts = useTractRows();
   const [unit, setUnit] = useState<Unit>("tract");
   const [layerId, setLayerId] = useState("fei");
@@ -122,12 +124,24 @@ export default function MapExplorer() {
   const markers: MapMarker[] = useMemo(() => {
     if (!overlays.shelves) return [];
     const counts = new Map<string, number>();
-    data.shelves.filter((s) => s.active).forEach((s) => counts.set(s.county_fips, (counts.get(s.county_fips) ?? 0) + 1));
+    let title = (n: number) => `${n} shelves in this workspace`;
+    if (session.mode === "live") {
+      data.shelves.filter((s) => s.active).forEach((s) => counts.set(s.county_fips, (counts.get(s.county_fips) ?? 0) + 1));
+    } else {
+      // County networks are one record per county, so count the sites reporting in the as-of month.
+      if (!siteMix) return [];
+      for (const [fips, types] of Object.entries(siteMix.counties)) {
+        const n = Object.values(types).reduce((s, t) => s + (t?.sites ?? 0), 0);
+        if (n) counts.set(fips, n);
+      }
+      const when = siteMix.month ? `, ${monthLabel(siteMix.month)}` : "";
+      title = (n) => `${n} reporting site${n === 1 ? "" : "s"}${when}`;
+    }
     return [...counts.entries()].flatMap(([fips, n]) => {
       const cc = countiesByFips[fips]?.centroid;
-      return cc ? [{ id: `count-${fips}`, kind: "count" as const, lon: cc[0], lat: cc[1], label: String(n), size: 18 + Math.sqrt(n) * 5, title: `${n} shelves in this workspace` }] : [];
+      return cc ? [{ id: `count-${fips}`, kind: "count" as const, lon: cc[0], lat: cc[1], label: String(n), size: 18 + Math.sqrt(n) * 5, title: title(n) }] : [];
     });
-  }, [data.shelves, overlays.shelves]);
+  }, [data.shelves, overlays.shelves, session.mode, siteMix]);
 
   const nameOf = (id: string) =>
     shownUnit === "tract" ? `${tracts.byId.get(id)?.name ?? id} · ${countiesByFips[id.slice(0, 5)]?.name ?? ""} County` : `${countiesByFips[id]?.name ?? id} County`;
@@ -202,7 +216,8 @@ export default function MapExplorer() {
 
   return (
     <div className="flex h-auto flex-col lg:h-[calc(100dvh-56px)] lg:flex-row">
-      <div className="relative h-[68vh] min-h-[440px] flex-1 lg:h-auto">
+      {/* flex-1 only at lg: in the stacked layout a 0% flex-basis leaves the map's h-full child at zero height. */}
+      <div className="relative h-[68vh] min-h-[440px] lg:h-auto lg:flex-1">
         <GeoMap
           geometry={geometry}
           fill={fill}

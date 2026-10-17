@@ -35,8 +35,12 @@ export default function HistoryPage() {
     <>
       <PageHeader
         eyebrow="History"
-        title="Your reports"
-        description="Every month you have submitted. Edit a month to correct it; the forecast updates immediately."
+        title={shelf.is_demo ? "Network reports" : "Your reports"}
+        description={
+          shelf.is_demo
+            ? "County totals from the statewide extract, plus any month added in this browser. Edit a month to correct it; the forecast updates immediately."
+            : "Every month you have submitted. Edit a month to correct it; the forecast updates immediately."
+        }
         actions={<Button variant="secondary" onClick={exportCsv}>Export CSV</Button>}
       />
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">

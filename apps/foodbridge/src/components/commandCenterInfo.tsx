@@ -1,6 +1,6 @@
 import type { Info } from "./InfoTip";
 import { addMonths, monthLabel, workdays } from "@/lib/calendar";
-import { PILLARS } from "@/lib/pillars";
+import { PILLARS, feiFormula } from "@/lib/pillars";
 import { DEFAULT_WEIGHTS, PRIORITY_PARTS } from "@/lib/priority";
 import { EQUITY_SHORT, feiReady, research } from "@/lib/research";
 
@@ -151,7 +151,7 @@ export function commandCenterInfo(asOf: string, workspace: "demo" | "live"): Rec
         : `${EQUITY_SHORT}: the Q6 need percentile, shown until the FEI tables are built.`,
       how: feiReady ? (
         <>
-          FEI = 100 × ({PILLARS.map((p) => `${p.weight}·${p.key}`).join(" + ")}); each pillar 0–1, higher = more barriers.{" "}
+          {feiFormula()}; each pillar 0–1, higher = more barriers, and need and access multiply.{" "}
           {PILLARS.map((p) => `${p.key} ${p.label}: ${p.what}`).join(" ")} Dashed outlines mark Q6 audit-first counties, a call list for local checks.
         </>
       ) : (

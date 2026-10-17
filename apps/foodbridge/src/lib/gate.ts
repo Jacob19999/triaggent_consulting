@@ -34,6 +34,8 @@ export async function hasPortalAccess(cookie: string | undefined): Promise<boole
 /** Same-site relative path to return to after the gate; anything else falls back to "/". */
 export function safeNext(next: string | null | undefined): string {
   if (!next || !next.startsWith("/") || next.startsWith("//") || next.startsWith("/\\")) return "/";
+  // Browsers strip tabs and newlines from URLs, so "/\t/evil.test" would become "//evil.test".
+  if (/[\u0000-\u001f\u007f\\]/.test(next)) return "/";
   return next.startsWith(GATE_PATH) ? "/" : next;
 }
 

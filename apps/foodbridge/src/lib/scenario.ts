@@ -3,6 +3,7 @@
 // and the FEI change follows A4's published formulas applied to tract averages.
 
 import { haversineMiles } from "./geo";
+import { DEFAULT_FEI_WEIGHTS, feiFromPillars, type PillarWeights } from "./pillars";
 import { countiesByFips, feiReady, research } from "./research";
 import type { FeiTract, ShelfType, Tract } from "./types";
 
@@ -249,23 +250,24 @@ function normalizer(key: string, values: (number | null | undefined)[]) {
   return (x: number) => (hi > lo ? Math.max(0, Math.min(1, (x - lo) / (hi - lo))) : 0.5);
 }
 
-const FEI_WEIGHTS = { N: 0.25, S: 0.25, T: 0.2, M: 0.15, V: 0.15 };
 const T_WEIGHTS = { d: 0.5, beyond: 0.3, bm: 0.2 };
 
-function feiWeights(): typeof FEI_WEIGHTS {
-  const params = research.fei.meta?.params as { weights?: Partial<Record<keyof typeof FEI_WEIGHTS, number>> } | undefined;
+function feiWeights(): PillarWeights {
+  const params = research.fei.meta?.params as { weights?: Partial<PillarWeights> } | undefined;
   const w = params?.weights;
-  if (!w) return FEI_WEIGHTS;
-  const merged = { ...FEI_WEIGHTS, ...w };
+  if (!w) return DEFAULT_FEI_WEIGHTS;
+  const merged = { ...DEFAULT_FEI_WEIGHTS, ...w };
   const sum = Object.values(merged).reduce((s, v) => s + (v ?? 0), 0);
   // Accept weights given as fractions or as points out of 100.
   return sum > 1.5
-    ? (Object.fromEntries(Object.entries(merged).map(([k, v]) => [k, (v ?? 0) / 100])) as typeof FEI_WEIGHTS)
-    : (merged as typeof FEI_WEIGHTS);
+    ? (Object.fromEntries(Object.entries(merged).map(([k, v]) => [k, (v ?? 0) / 100])) as PillarWeights)
+    : (merged as PillarWeights);
 }
 
-/** FEI change from A4's tract table. Uses deltas on S and T so a small mismatch between
- * this engine and the pipeline's exact block-level values does not shift the baseline. */
+/** FEI change from A4's tract table. S and T move by this engine's deltas from the tract's
+ * published pillars, FEI is recomputed with the build's formula (need × access, D-069), and only
+ * the change is added to the published FEI, so a small mismatch between this engine and the
+ * pipeline's exact block-level values does not shift the baseline. */
 export function feiImpact(input: NewShelfInput, tracts: FeiTract[] = []): {
   impact: FeiImpact;
   byTract: Map<string, { before: number; after: number }>;
@@ -328,7 +330,14 @@ export function feiImpact(input: NewShelfInput, tracts: FeiTract[] = []): {
         T_WEIGHTS.d * normD(t.d!) + T_WEIGHTS.beyond * beyondBefore + T_WEIGHTS.bm * normBM(Math.max(0, bmBefore - theta(t)));
       const tAfter =
         T_WEIGHTS.d * normD(dAfter) + T_WEIGHTS.beyond * beyondAfter + T_WEIGHTS.bm * normBM(Math.max(0, bmAfter - theta(t)));
-      after = Math.max(0, t.fei! + 100 * (w.S * (sAfter - sBefore) + w.T * (tAfter - tBefore)));
+      const clip = (x: number) => Math.max(0, Math.min(1, x));
+      const base = { N: t.N, S: t.S, T: t.T, M: t.M, V: t.V };
+      const feiBefore = feiFromPillars(base, w);
+      const feiAfter = feiFromPillars(
+        { ...base, S: clip((t.S ?? 0) + sAfter - sBefore), T: clip((t.T ?? 0) + tAfter - tBefore) },
+        w,
+      );
+      if (feiBefore != null && feiAfter != null) after = Math.max(0, t.fei! + feiAfter - feiBefore);
       if (after < t.fei! - 1e-9) {
         improved++;
         byTract.set(t.geoid, { before: t.fei!, after });

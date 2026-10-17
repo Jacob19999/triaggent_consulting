@@ -12,9 +12,18 @@ function lastWeekday(year: number, month: number, weekday: number): number {
   return days - ((last - weekday + 7) % 7);
 }
 
+// workdays() and addMonths() are pure and called hundreds of thousands of times by the
+// per-network backtests on every page load; a few dozen distinct months repeat, so cache them.
+const holidayCache = new Map<number, Set<string>>();
+const workdayCache = new Map<string, number>();
+const addMonthsCache = new Map<string, string>();
+
 /** Observed closure dates (weekend holidays shift to Friday/Monday). */
 function holidays(year: number): Set<string> {
+  const cached = holidayCache.get(year);
+  if (cached) return cached;
   const out = new Set<string>();
+  holidayCache.set(year, out);
   const add = (m: number, d: number) => {
     const date = new Date(Date.UTC(year, m, d));
     const dow = date.getUTCDay();
@@ -33,6 +42,8 @@ function holidays(year: number): Set<string> {
 
 /** Working days in a YYYY-MM month. */
 export function workdays(month: string): number {
+  const cached = workdayCache.get(month);
+  if (cached !== undefined) return cached;
   const [y, m] = month.split("-").map(Number);
   const closed = holidays(y);
   const days = new Date(Date.UTC(y, m, 0)).getUTCDate();
@@ -42,6 +53,7 @@ export function workdays(month: string): number {
     const dow = date.getUTCDay();
     if (dow !== 0 && dow !== 6 && !closed.has(date.toISOString().slice(0, 10))) count++;
   }
+  workdayCache.set(month, count);
   return count;
 }
 
@@ -63,9 +75,13 @@ export function daysInMonth(month: string): number {
 }
 
 export function addMonths(month: string, n: number): string {
+  const key = `${month}|${n}`;
+  const cached = addMonthsCache.get(key);
+  if (cached !== undefined) return cached;
   const [y, m] = month.split("-").map(Number);
-  const date = new Date(Date.UTC(y, m - 1 + n, 1));
-  return date.toISOString().slice(0, 7);
+  const out = new Date(Date.UTC(y, m - 1 + n, 1)).toISOString().slice(0, 7);
+  addMonthsCache.set(key, out);
+  return out;
 }
 
 export function monthRange(from: string, to: string): string[] {

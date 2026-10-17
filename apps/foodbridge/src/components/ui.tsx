@@ -143,6 +143,7 @@ export function Stat({
   icon,
   accent,
   info,
+  children,
 }: {
   label: ReactNode;
   value: ReactNode;
@@ -151,22 +152,25 @@ export function Stat({
   icon?: string;
   accent?: string;
   info?: Info;
+  children?: ReactNode;
 }) {
   return (
     <div className="relative min-w-0 overflow-hidden rounded-[var(--radius-card)] border border-line bg-surface p-4 shadow-[var(--shadow)]">
       <span className="absolute inset-y-0 left-0 w-[3px]" style={{ background: accent ?? "var(--accent)" }} aria-hidden />
-      <div className="flex items-start justify-between gap-2">
-        <div className="flex min-w-0 flex-wrap items-center gap-x-1.5 gap-y-1 text-[11.5px] font-semibold uppercase leading-tight tracking-[0.06em] text-muted">
-          <span className="min-w-0 break-words">{label}</span>
-          {tone === "forecast" && <ForecastBadge />}
-        </div>
+      {/* Two label lines are reserved so values in one row line up when a neighbour's label wraps. */}
+      <div className="flex min-h-[2lh] items-start justify-between gap-2 text-[11.5px] leading-tight">
+        <span className="min-w-0 break-words font-semibold uppercase tracking-[0.06em] text-muted">{label}</span>
         <span className="flex shrink-0 items-center gap-1.5">
           {info && <InfoTip info={info} label={`About ${typeof label === "string" ? label : "this figure"}`} />}
           {icon && <Icon name={icon} className="h-4 w-4 text-muted" />}
         </span>
       </div>
-      <div className="mt-2 text-[26px] font-semibold leading-none tracking-[-0.02em] text-ink">{value}</div>
+      <div className="mt-2 flex flex-wrap items-baseline gap-x-2 gap-y-1">
+        <span className="text-[26px] font-semibold leading-none tracking-[-0.02em] text-ink">{value}</span>
+        {tone === "forecast" && <ForecastBadge />}
+      </div>
       {sub && <div className="mt-2 text-[12.5px] leading-snug text-ink-2">{sub}</div>}
+      {children}
     </div>
   );
 }

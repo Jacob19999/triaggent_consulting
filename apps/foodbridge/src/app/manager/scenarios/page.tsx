@@ -971,7 +971,8 @@ export default function SitePlanner() {
   return (
     <div className="flex h-auto flex-col lg:h-[calc(100dvh-56px)] lg:flex-row">
       {/* ---------------- Map ---------------- */}
-      <div className="flex min-h-0 min-w-0 flex-1 flex-col">
+      {/* flex-1 only at lg: in the stacked layout a 0% flex-basis leaves the map's h-full child at zero height. */}
+      <div className="flex min-h-0 min-w-0 flex-col lg:flex-1">
         <div className="flex flex-wrap items-center gap-x-5 gap-y-2 border-b border-line bg-surface px-4 py-2.5">
           <Segmented<View>
             label="Map view"
@@ -990,7 +991,7 @@ export default function SitePlanner() {
           )}
           <div className="min-w-[340px] flex-1">{toolbarLegend}</div>
         </div>
-        <div className="relative h-[62vh] min-h-[420px] flex-1 lg:h-auto">
+        <div className="relative h-[62vh] min-h-[420px] lg:h-auto lg:flex-1">
           <GeoMap
             geometry={tracts.geometry ?? research.geometry}
             fill={fill}

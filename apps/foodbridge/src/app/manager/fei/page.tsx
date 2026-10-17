@@ -7,7 +7,7 @@ import { CountyMapCard } from "@/components/map/CountyMapCard";
 import { Badge, Card, PageHeader, Segmented, SourceNote, Stat } from "@/components/ui";
 import { useFeiTracts } from "@/lib/feiTracts";
 import { fmt } from "@/lib/format";
-import { PILLARS } from "@/lib/pillars";
+import { PILLARS, DIMENSIONS, feiContributions, feiFormula } from "@/lib/pillars";
 import { countiesByFips, equityValue, feiReady, research } from "@/lib/research";
 import type { County, Pillar } from "@/lib/types";
 
@@ -53,12 +53,7 @@ const CHECK_LABEL: Record<string, string> = {
 };
 
 function weighted(values: Partial<Record<Pillar, number | null | undefined>>) {
-  return PILLARS.map((p) => ({
-    key: p.key,
-    label: p.label,
-    color: p.color,
-    value: 100 * p.weight * (values[p.key] ?? 0),
-  }));
+  return feiContributions(values);
 }
 
 export default function FeiOverview() {
@@ -207,7 +202,7 @@ export default function FeiOverview() {
               </span>
               {sel.fei?.stable_high && <Badge tone="demo">Stable high</Badge>}
             </div>
-            <p className="mt-3 text-[12.5px] font-medium text-ink-2">Why this score: weighted points by pillar (sum = FEI)</p>
+            <p className="mt-3 text-[12.5px] font-medium text-ink-2">Why this score: points by pillar (sum = FEI; need side × access side)</p>
             <div className="mt-1.5">
               <StackedBar parts={weighted(sel.fei ?? {})} total={100} />
             </div>
@@ -332,7 +327,7 @@ export default function FeiOverview() {
         </Card>
       </div>
 
-      <Card className="mt-4" title="How FEI works" subtitle="FEI = 100 × (0.25·N + 0.25·S + 0.20·T + 0.15·M + 0.15·V). Each pillar 0–1, 1 = worst.">
+      <Card className="mt-4" title="How FEI works" subtitle={`${feiFormula()}. Each pillar 0–1, 1 = worst; the two sides multiply, so a tract scores high only when need and access barriers are both high (D-069).`}>
         <div className="grid grid-cols-1 gap-3 md:grid-cols-5">
           {PILLARS.map((p) => (
             <div key={p.key} className="rounded-xl border border-line p-3">
@@ -341,7 +336,9 @@ export default function FeiOverview() {
                   <span className="h-2.5 w-2.5 rounded-sm" style={{ background: p.color }} />
                   {p.key} · {p.label}
                 </span>
-                <span className="tabular text-[12px] text-muted">{Math.round(p.weight * 100)}%</span>
+                <span className="tabular text-[12px] text-muted">
+                  {Math.round(p.weight * 100)}% · {DIMENSIONS.need.includes(p.key) ? "need" : "access"}
+                </span>
               </div>
               <p className="mt-1.5 text-[12.5px] leading-snug text-ink-2">{p.what}</p>
             </div>

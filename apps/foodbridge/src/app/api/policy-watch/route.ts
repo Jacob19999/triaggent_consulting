@@ -1,6 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { z } from "zod";
-import { createGeminiClient, DEFAULT_AI_MODEL, FALLBACK_AI_MODEL, GeminiAPIError } from "@/lib/agent/gemini";
+import { createGeminiClient, FALLBACK_AI_MODEL, GeminiAPIError, resolveAiModel, shouldFallback } from "@/lib/agent/gemini";
 import { clientIp, limited } from "@/lib/agent/limit";
 import { policyWatchTask } from "@/lib/agent/policyTask";
 import { POLICY_WATCH_PROMPT } from "@/lib/agent/prompt";
@@ -47,7 +47,7 @@ export async function POST(req: NextRequest) {
   const limit = limited(clientIp(req.headers));
   if (limit) return NextResponse.json({ error: limit }, { status: 429 });
 
-  const model = process.env.FOODBRIDGE_AI_MODEL?.trim() || DEFAULT_AI_MODEL;
+  const model = resolveAiModel();
   const today = new Date().toISOString().slice(0, 10);
   const deadline = Date.now() + 95_000;
   const ask = (name: string) =>
@@ -64,7 +64,7 @@ export async function POST(req: NextRequest) {
     try {
       response = await ask(model);
     } catch (e) {
-      if (!(e instanceof GeminiAPIError) || e.status !== 503 || model !== DEFAULT_AI_MODEL) throw e;
+      if (!shouldFallback(e, model)) throw e;
       response = await ask(FALLBACK_AI_MODEL);
       usedFallback = true;
     }

@@ -3,7 +3,7 @@ import { z } from "zod";
 import { offlineBriefing } from "@/lib/agent/fallback";
 import { MODE_PROMPTS } from "@/lib/agent/prompt";
 import { runAgent } from "@/lib/agent/run";
-import { createGeminiClient, DEFAULT_AI_MODEL, FALLBACK_AI_MODEL, GeminiAPIError } from "@/lib/agent/gemini";
+import { createGeminiClient, FALLBACK_AI_MODEL, GeminiAPIError, resolveAiModel, shouldFallback } from "@/lib/agent/gemini";
 import { clientIp, limited } from "@/lib/agent/limit";
 import { Snapshot } from "@/lib/agent/tools";
 import { briefRow, isApprovedRole } from "@/lib/briefs";
@@ -80,7 +80,7 @@ export async function POST(req: NextRequest) {
   const limit = limited(clientIp(req.headers));
   if (limit) return NextResponse.json({ error: limit }, { status: 429 });
 
-  const model = process.env.FOODBRIDGE_AI_MODEL?.trim() || DEFAULT_AI_MODEL;
+  const model = resolveAiModel();
   const task = [
     MODE_PROMPTS[body.mode],
     `As-of month: ${body.snapshot.asOf}. Workspace: ${body.snapshot.workspace}.`,
@@ -98,8 +98,12 @@ export async function POST(req: NextRequest) {
     try {
       result = await generate(model);
     } catch (e) {
-      if (!(e instanceof GeminiAPIError) || e.status !== 503 || model !== DEFAULT_AI_MODEL) throw e;
+      if (!shouldFallback(e, model)) throw e;
       // Restart the conversation: signatures from one model cannot be replayed to another.
+      result = await generate(FALLBACK_AI_MODEL);
+      usedFallback = true;
+    }
+    if ((result.status !== "ok" || !result.markdown) && !usedFallback && model !== FALLBACK_AI_MODEL) {
       result = await generate(FALLBACK_AI_MODEL);
       usedFallback = true;
     }
@@ -128,7 +132,9 @@ export async function POST(req: NextRequest) {
         ? "Google Gemini's request limit was reached; showing the offline briefing. Try again later."
         : status === 503
           ? "Google Gemini is experiencing high demand; showing the offline briefing. Try again shortly."
-          : "Google Gemini is unavailable; showing the offline briefing.",
+          : status === 504
+            ? "Google Gemini timed out; showing the offline briefing."
+            : "Google Gemini is unavailable; showing the offline briefing.",
     });
   }
 }

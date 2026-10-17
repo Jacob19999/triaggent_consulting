@@ -325,8 +325,7 @@ export default function ManagerDashboard() {
         title="Command center"
         description={
           <>
-            Where the network stands for {monthLabel(asOf, "long")}, how it is trending, where food goes and through which kinds of centers, what needs
-            attention, and which policies and shelf requests to act on. Click{" "}
+            Where the network stands for {monthLabel(asOf, "long")} and what needs attention. Click{" "}
             <span className="inline-grid h-[16px] w-[16px] place-items-center rounded-full border border-line-strong align-[-2px] text-[10px] font-semibold text-muted">i</span>{" "}
             on any panel for what it shows and how it is calculated.
           </>

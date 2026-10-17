@@ -22,6 +22,9 @@ describe("portal gate", () => {
   it("only returns to same-site paths", () => {
     expect(safeNext("/manager?x=1")).toBe("/manager?x=1");
     for (const bad of ["https://evil.test", "//evil.test", "/\\evil.test", "/gate?next=/x", "", null]) expect(safeNext(bad)).toBe("/");
+    // Control characters a browser drops while parsing ("/\t/evil.test" resolves to evil.test).
+    for (const bad of ["/\t/evil.test", "/\n/evil.test", "/\r/evil.test", "/x\\y"]) expect(safeNext(bad)).toBe("/");
+    expect(new URL(safeNext("/\t/evil.test"), "https://foodbridge.test").host).toBe("foodbridge.test");
   });
 
   it("keeps only the gate, favicon and robots open", () => {

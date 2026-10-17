@@ -36,6 +36,8 @@ export default function ShelfHome() {
   const missing = outlook.overdue;
   const s = SERIES.find((x) => x.key === series)!;
   const fc = series === "households" ? outlook.households : series === "pounds_distributed" ? outlook.pounds : outlook.individuals;
+  // County-network mode shows county totals kept in this browser, not one shelf's own reports.
+  const network = shelf.is_demo;
 
   return (
     <>
@@ -80,22 +82,30 @@ export default function ShelfHome() {
           value={fmt.int(outlook.pounds?.yhat)}
           sub={outlook.pounds ? `80% band ${fmt.int(outlook.pounds.lo80)}–${fmt.int(outlook.pounds.hi80)} lb` : "—"}
         />
-        <div className="rounded-[14px] border border-line bg-surface p-4">
-          <div className="text-[12px] font-medium uppercase tracking-wide text-muted">Food on hand</div>
-          <div className="mt-1.5 text-2xl font-semibold text-ink">{outlook.daysOfSupply == null ? "—" : `${fmt.num(outlook.daysOfSupply, 0)} days`}</div>
-          <div className="mt-1 text-[12.5px] text-ink-2">
-            {fmt.int(latest?.inventory_lbs)} lb · covers {fmt.pct(outlook.coverage)} of next month with typical deliveries
-          </div>
-          <div className="mt-2">
-            <Meter value={Math.min(1, outlook.coverage ?? 0)} color={(outlook.coverage ?? 0) < 1 ? "var(--critical)" : "var(--good)"} label="Coverage" />
-          </div>
-        </div>
+        {outlook.coverage == null ? (
+          <Stat
+            label="Food on hand"
+            value="Unknown"
+            accent="var(--muted)"
+            sub={network ? "Not in the statewide extract, so stock cover cannot be checked." : "Add food on hand to your monthly report to check stock cover."}
+          />
+        ) : (
+          <Stat
+            label="Food on hand"
+            value={outlook.daysOfSupply == null ? "—" : `${fmt.num(outlook.daysOfSupply, 0)} days`}
+            sub={`${fmt.int(latest?.inventory_lbs)} lb · covers ${fmt.pct(outlook.coverage)} of next month with typical deliveries`}
+          >
+            <div className="mt-2">
+              <Meter value={Math.min(1, outlook.coverage)} color={outlook.coverage < 1 ? "var(--critical)" : "var(--good)"} label="Coverage" />
+            </div>
+          </Stat>
+        )}
       </div>
 
       <div className="mt-4 grid grid-cols-1 gap-4 xl:grid-cols-[1.35fr_1fr]">
         <Card
-          title="Your trend and next month's forecast"
-          subtitle={`Forecast: your last three months per working day, weighted 1:2:3 toward the latest (the team's county method, D-045). ${fc?.band === "backtest" ? `Band from ${fc.backtests} of your own past months.` : "Default ±20% / ±35% band until you have more history."}`}
+          title={network ? "Network trend and next month's forecast" : "Your trend and next month's forecast"}
+          subtitle={`Forecast: the last three months per working day, weighted 1:2:3 toward the latest (the team's county method, D-045). ${fc?.band === "backtest" ? `Band from ${fc.backtests} past months.` : "Default ±20% / ±35% band until there is more history."}`}
           actions={
             <div className="flex rounded-lg border border-line p-0.5" role="group" aria-label="Series">
               {SERIES.map((x) => (
@@ -118,13 +128,21 @@ export default function ShelfHome() {
             label={s.label}
           />
           <SourceNote>
-            {s.field} from your monthly reports. The open circle is the forecast; dark band 80%, light band 95%. It is a
+            {s.field} {network ? "summed over the county's reporting sites" : "from your monthly reports"}. The open circle is the forecast; dark band 80%, light band 95%. It is a
             planning range, not a promise.
           </SourceNote>
         </Card>
         <div className="space-y-4">
-          <Card title="Alerts for your shelf" subtitle="From your reports and next month's forecast.">
-            <AlertList alerts={mine} showWhere={false} emptyText="No alerts. Your forecast looks covered." />
+          <Card title={network ? "Alerts for this network" : "Alerts for your shelf"} subtitle="From the monthly reports and next month's forecast.">
+            <AlertList
+              alerts={mine}
+              showWhere={false}
+              emptyText={
+                outlook.coverage == null
+                  ? "No alerts, but stock cover is unchecked: no food-on-hand figure has been reported."
+                  : "No alerts. Food on hand and typical deliveries cover next month's forecast."
+              }
+            />
           </Card>
           <Card title={`${county?.name} County context`}>
             <dl className="grid grid-cols-2 gap-x-4 gap-y-1.5 text-[13px]">

@@ -5,7 +5,7 @@
 
 import { z } from "zod";
 import { addMonths } from "../calendar";
-import { PILLARS } from "../pillars";
+import { PILLARS, DIMENSIONS, feiFormula } from "../pillars";
 import { countiesByFips, feiReady, research, SIGNAL_FIELD } from "../research";
 import type { County, ForecastSignal } from "../types";
 
@@ -327,8 +327,9 @@ export function runTool(name: string, input: Record<string, unknown>, snap: Snap
       const meta = research.fei.meta ?? {};
       return feiReady
         ? {
-            formula: "FEI = 100 × (0.25·N + 0.25·S + 0.20·T + 0.15·M + 0.15·V), higher = more barriers",
-            pillars: PILLARS.map((p) => ({ key: p.key, label: p.label, weight: p.weight, definition: p.what })),
+            formula: `${feiFormula()}; higher = more barriers. Need and access multiply, so both must be high (D-069).`,
+            pillars: PILLARS.map((p) => ({ key: p.key, label: p.label, weight: p.weight, side: DIMENSIONS.need.includes(p.key) ? "need" : "access", definition: p.what })),
+            influence: meta.influence,
             validation: meta.fei_validation,
             kpis: meta.kpis,
             caution: "A screening index for where to look and where siting may help; not a count of unmet people, not causal.",

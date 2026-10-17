@@ -26,7 +26,7 @@ const PRESETS: { id: Preset; label: string; ids: () => string[]; hint: string }[
 ];
 
 const POLICIES = [
-  { w: 0, label: "Follow visits", hint: "Split by the August PoundsReg forecast: today's practice." },
+  { w: 0, label: "Follow demand", hint: "Split by each county's August pounds forecast (PoundsReg): today's demand-led practice." },
   { w: 50, label: "Balanced", hint: "Half by forecast demand, half by residents below poverty." },
   { w: 100, label: "Follow need", hint: "Split by ACS residents below poverty, the basis of 60% of USDA's TEFAP formula." },
 ];
@@ -162,7 +162,7 @@ export default function AllocationPage() {
       <PageHeader
         eyebrow="Analyze & plan"
         title="Supply allocation"
-        description="Draft how a pool of food is split between counties: by forecast visits, by need, or a blend. A draft for discussion; it never moves food on its own."
+        description="Draft how a pool of food is split between counties: by forecast pounds (demand), by need, or a blend. A draft for discussion; it never moves food on its own."
         actions={
           <>
             <Button variant="secondary" onClick={saveDraft} disabled={!result}>
@@ -183,7 +183,7 @@ export default function AllocationPage() {
           icon="scale"
           label="Moved toward need"
           value={`${fmt.compact(moved)} lb`}
-          sub={result ? `${fmt.pct(result.available ? moved / result.available : 0)} of the pool vs a visits-only split` : "—"}
+          sub={result ? `${fmt.pct(result.available ? moved / result.available : 0)} of the pool vs a demand-only split` : "—"}
           accent="var(--accent)"
         />
         <Stat
@@ -229,7 +229,7 @@ export default function AllocationPage() {
             />
             <div className="mt-4">
               <div className="flex items-center justify-between text-[11.5px] font-medium">
-                <span className="text-[var(--seq-3)]">Visits (demand)</span>
+                <span className="text-[var(--seq-3)]">Forecast pounds (demand)</span>
                 <span className="tabular rounded-md bg-surface-2 px-2 py-0.5 text-[12px] text-ink">{100 - needWeight}% · {needWeight}%</span>
                 <span className="text-accent">Poverty (need)</span>
               </div>
@@ -378,7 +378,7 @@ export default function AllocationPage() {
                                   <span className="font-semibold text-ink">{fmt.num(r.perPoor, 1)} lb</span>
                                 </div>
                                 <div className="flex justify-between gap-4">
-                                  <span>vs visits-only split</span>
+                                  <span>vs demand-only split</span>
                                   <span className="font-semibold text-ink">
                                     {r.change > 0 ? "+" : ""}
                                     {fmt.int(r.change)} lb
@@ -404,7 +404,7 @@ export default function AllocationPage() {
                 <Card
                   title="Where the pounds go"
                   icon="truck"
-                  subtitle="Bar = this draft. Ticks: what a visits-only and a need-only split would give."
+                  subtitle="Bar = this draft. Ticks: what a demand-only (forecast pounds) and a need-only split would give."
                   actions={
                     <Segmented<"draft" | "change" | "fei">
                       size="sm"
@@ -424,7 +424,7 @@ export default function AllocationPage() {
                       <span className="inline-block h-2.5 w-4 rounded-sm bg-accent" /> Draft
                     </span>
                     <span className="inline-flex items-center gap-1.5">
-                      <span className="inline-block h-3 w-[3px] rounded bg-[var(--seq-3)]" /> Visits-only split
+                      <span className="inline-block h-3 w-[3px] rounded bg-[var(--seq-3)]" /> Demand-only split
                     </span>
                     <span className="inline-flex items-center gap-1.5">
                       <span className="inline-block h-3 w-[3px] rounded bg-[var(--p-s)]" /> Need-only split
@@ -445,7 +445,7 @@ export default function AllocationPage() {
                           <span
                             className="absolute inset-y-0 w-[3px] -translate-x-1/2 rounded bg-[var(--seq-3)] ring-2 ring-[var(--surface)]"
                             style={{ left: `${(r.demandPounds / maxBar) * 100}%` }}
-                            title={`Visits-only: ${fmt.int(r.demandPounds)} lb`}
+                            title={`Demand-only: ${fmt.int(r.demandPounds)} lb`}
                           />
                           {r.needPounds != null && (
                             <span
@@ -480,7 +480,7 @@ export default function AllocationPage() {
                       <tr className="border-b border-line text-left text-[11px] uppercase tracking-wide text-muted">
                         <th className="py-2 font-medium">County</th>
                         <th className="py-2 text-right font-medium">Draft lb</th>
-                        <th className="py-2 text-right font-medium">Visits-only lb</th>
+                        <th className="py-2 text-right font-medium">Demand-only lb</th>
                         <th className="py-2 text-right font-medium">Aug forecast</th>
                         <th className="py-2 pl-4 font-medium">Draft ÷ forecast</th>
                         <th className="py-2 text-right font-medium">{EQUITY_SHORT}</th>

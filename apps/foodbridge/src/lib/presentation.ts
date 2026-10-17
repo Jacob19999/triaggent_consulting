@@ -58,11 +58,11 @@ export const SLIDES: SlideMeta[] = [
     seconds: 30,
     questions: ["Q6"],
     part: "Need",
-    steps: ["Need", "Supply", "Travel", "Mobility", "Demographics", "All five = FEI"],
+    steps: ["Need", "Supply", "Travel", "Mobility", "Demographics", "Need × access = FEI"],
     workspace: { href: "/manager/fei", label: "Equity index (FEI)" },
     notes: [
       "Press → through the five barriers: each one recolors every census tract. Red = more of that barrier.",
-      "Last step: the five add up to one 0–100 score, the Food Access Equity Index. No visit counts go in, so it can disagree with demand.",
+      "Last step: need (N, V) and access (S, T, M) multiply into one 0–100 score, the Food Access Equity Index, so a tract is high only where need and access barriers are both high. No visit counts go in, so it can disagree with demand.",
       "Point at: 2.7 million Minnesotans live beyond easy reach of a reporting shelf.",
       "Hand-off: “Daniela will show you where it is worst.”",
     ],
@@ -79,8 +79,8 @@ export const SLIDES: SlideMeta[] = [
     notes: [
       "Step 1: red tracts have the most barriers, in the rural west and north, not the metro.",
       "Step 2: each icon is a food shelf reporting in July. They sit where people are; the reddest tracts have few.",
-      "Step 3: 1.08 million residents, 258,000 of them children, live in the highest-barrier fifth.",
-      "If asked “is it need?”: it rises with SNAP use (0.55) and Feeding America's estimate (0.80), and neither is an input.",
+      "Step 3: 1.06 million residents, 250,000 of them children, live in the highest-barrier fifth.",
+      "If asked “is it need?”: it rises with SNAP use (0.59) and Feeding America's estimate (0.85), and neither is an input.",
       "Bridge: “So how would we know this score is wrong?”",
     ],
     files: ["outputs/tables/fei_tracts.csv", "outputs/tables/fei_validation.csv", "apps/foodbridge/public/data/sites.json"],
@@ -262,7 +262,10 @@ export const SLIDES: SlideMeta[] = [
     questions: ["Q6"],
     part: "Appendix",
     appendix: true,
-    notes: ["Weights are policy choices; the ranking survives re-weighting."],
+    notes: [
+      "Weights are policy choices; the ranking survives re-weighting.",
+      "If asked why multiply: access barriers matter where there is need, as in USDA's low-income and low-access tracts; under the old sum, 16% of top-fifth tracts had below-median need (now 5%), and supply drove 43% of the score's variation at a 25% weight.",
+    ],
     files: ["outputs/tables/fei_validation.csv", "outputs/tables/fei_sensitivity.csv"],
   },
   {

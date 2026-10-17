@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import type { ReactNode } from "react";
 import { DataProvider } from "@/components/DataProvider";
+import { QrHandoff } from "@/components/QrHandoff";
 import { THEME_SCRIPT } from "@/lib/themeScript";
 import "./globals.css";
 
@@ -35,6 +36,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
           Skip to content
         </a>
         <DataProvider>{children}</DataProvider>
+        <QrHandoff />
       </body>
     </html>
   );

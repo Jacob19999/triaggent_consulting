@@ -8,6 +8,7 @@ import { buildNetworkData, NETWORK_AS_OF, NETWORKS_SHA, SITE_TYPES, siteTypesFro
 import { forecastNext } from "@/lib/forecast";
 import { haversineMiles } from "@/lib/geo";
 import { prioritize } from "@/lib/priority";
+import { DEFAULT_FEI_WEIGHTS, feiContributions, feiFromPillars } from "@/lib/pillars";
 import { research } from "@/lib/research";
 import { decay, DEFAULT_MONEY, feiImpact, runScenario } from "@/lib/scenario";
 import type { FeiTractPayload } from "@/lib/types";
@@ -100,7 +101,34 @@ function loadFeiTracts(): FeiTractPayload {
   return JSON.parse(readFileSync(path.join(__dirname, "../public/data/fei-tracts.json"), "utf8"));
 }
 
+describe("FEI formula (D-069)", () => {
+  it("multiplies need and access and matches the pipeline's hand case", () => {
+    // Same case as tests/test_fei.py: Need = 0.68, Access = 0.45.
+    expect(feiFromPillars({ N: 0.8, S: 0.2, T: 0.6, M: 0.5, V: 0.4 })).toBeCloseTo(100 * Math.sqrt(0.68 * 0.45), 9);
+    expect(feiFromPillars({ N: 0, S: 1, T: 1, M: 1, V: 0 })).toBe(0);
+    expect(feiFromPillars({ N: 0.5, S: null, T: 0.5, M: 0.5, V: 0.5 })).toBeNull();
+    expect(DEFAULT_FEI_WEIGHTS.N + DEFAULT_FEI_WEIGHTS.V).toBeCloseTo(0.5, 12);
+  });
+  it("splits FEI into pillar points that add up to it", () => {
+    const v = { N: 0.8, S: 0.2, T: 0.6, M: 0.5, V: 0.4 };
+    const sum = feiContributions(v).reduce((s, p) => s + p.value, 0);
+    expect(sum).toBeCloseTo(feiFromPillars(v)!, 9);
+  });
+});
+
 describe.runIf(research.fei.status === "ready")("FEI consistency with the build", () => {
+  it("recomputes tract FEI from the published pillars within rounding", () => {
+    const { tracts } = loadFeiTracts();
+    const w = research.fei.meta!.params as { weights: typeof DEFAULT_FEI_WEIGHTS };
+    expect(w.weights).toEqual(DEFAULT_FEI_WEIGHTS);
+    let worst = 0;
+    for (const t of tracts) {
+      const f = feiFromPillars(t);
+      if (f == null || t.fei == null) continue;
+      worst = Math.max(worst, Math.abs(f - t.fei));
+    }
+    expect(worst).toBeLessThan(0.05);
+  });
   it("recomputes T from published inputs and bounds within rounding", () => {
     const { tracts } = loadFeiTracts();
     const norm = research.fei.meta!.normalization as Record<string, { bounds: [number, number] }>;

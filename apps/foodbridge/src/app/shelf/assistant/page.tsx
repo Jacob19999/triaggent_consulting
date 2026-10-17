@@ -14,7 +14,7 @@ export default function ShelfAssistant() {
       <PageHeader
         eyebrow="Assistant"
         title="What does next month look like for us?"
-        description="The assistant reads your shelf's forecast and alerts, your county's research profile and the policy timeline, then explains what to prepare for and what to ask the food bank for. It never decides eligibility or quotes benefit amounts."
+        description="The assistant reads the selected shelf or county network's forecast and alerts, the county's research profile and the policy timeline, then explains what to prepare for and what to ask the food bank for. It never decides eligibility or quotes benefit amounts."
       />
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
         <Card title="Shelf briefing">
