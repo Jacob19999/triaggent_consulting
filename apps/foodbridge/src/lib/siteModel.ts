@@ -5,13 +5,12 @@
 // Forecast for a new site, per tract whose nearest reporting shelf would become the new site:
 //   shifted visits = residents × county forecast visits per resident × Huff share × site reach
 //   Huff share     = d_new^-2 / (d_new^-2 + d_old^-2)   (gravity model, distances floored at 0.25 mi)
-//   induced visits = shifted × (min(cap, e^(k × miles saved)) − 1)
-// where k is the cross-county association between distance and visits per low-income
-// resident (2024 HouseholdsReg, fitted here from the bundle; an association, not causal).
+//   additional visits = shifted × an explicit user assumption (default zero).
+// Cross-county associations do not identify the response to opening a new site.
 // Pounds, individuals and ages follow the county's forecast ratios.
 
 import { haversineMiles } from "./geo";
-import { countiesByFips, research } from "./research";
+import { countiesByFips, feiReady, research } from "./research";
 import { DEFAULT_MONEY, runScenario, type MoneyAssumptions, type ScenarioResult } from "./scenario";
 import type { County, FeiTract, ShelfType, Tract } from "./types";
 
@@ -24,7 +23,20 @@ export const TYPE_REACH: Record<ShelfType, number> = {
   campus: 0.35,
 };
 export const HUFF_EXPONENT = 2;
-export const UPLIFT_CAP = 1.5;
+export const MAX_ADDITIONAL_VISITS_PCT = 50;
+export interface SiteAssumptions {
+  additionalVisitsPct: number;
+  additionalSupplyPct: number;
+}
+// D-070: do not assume a causal attendance gain or additional network supply.
+export const DEFAULT_SITE_ASSUMPTIONS: SiteAssumptions = { additionalVisitsPct: 0, additionalSupplyPct: 0 };
+
+function validateAssumptions(a: SiteAssumptions) {
+  if (!Number.isFinite(a.additionalVisitsPct) || a.additionalVisitsPct < 0 || a.additionalVisitsPct > MAX_ADDITIONAL_VISITS_PCT ||
+      !Number.isFinite(a.additionalSupplyPct) || a.additionalSupplyPct < 0 || a.additionalSupplyPct > 100) {
+    throw new Error("Additional visits must be 0–50% and additional food must be 0–100%.");
+  }
+}
 const MIN_MILES = 0.25;
 
 export interface CountyRates {
@@ -126,13 +138,15 @@ export interface SiteForecast {
   catchmentTracts: number;
   milesSavedPerVisit: number;
   reach: number;
-  perMile: number;
+  assumedAdditionalVisitsPct: number;
+  newVisitMiles: number;
   stateRatesUsed: boolean;
 }
 
-export function forecastNewSite(lon: number, lat: number, type: ShelfType, tracts: Tract[] = research.tracts): SiteForecast {
+export function forecastNewSite(lon: number, lat: number, type: ShelfType, tracts: Tract[] = research.tracts,
+  assumptions: SiteAssumptions = DEFAULT_SITE_ASSUMPTIONS): SiteForecast {
+  validateAssumptions(assumptions);
   const reach = TYPE_REACH[type];
-  const k = Math.max(0, -distanceAssociation().perMile);
   let shifted = 0,
     induced = 0,
     lo = 0,
@@ -146,6 +160,7 @@ export function forecastNewSite(lon: number, lat: number, type: ShelfType, tract
     residents = 0,
     n = 0,
     savedW = 0,
+    newTripW = 0,
     stateUsed = false;
   for (const t of tracts) {
     if (t.d == null) continue;
@@ -157,8 +172,7 @@ export function forecastNewSite(lon: number, lat: number, type: ShelfType, tract
     const b = Math.max(MIN_MILES, t.d) ** -HUFF_EXPONENT;
     const base = t.p * r.visitsPerResident * (a / (a + b)) * reach;
     const saved = t.d - miles;
-    const uplift = Math.min(UPLIFT_CAP, Math.exp(k * saved));
-    const extra = base * (uplift - 1);
+    const extra = base * assumptions.additionalVisitsPct / 100;
     const v = base + extra;
     shifted += base;
     induced += extra;
@@ -172,7 +186,8 @@ export function forecastNewSite(lon: number, lat: number, type: ShelfType, tract
     ad += i * r.adultShare;
     se += i * r.seniorShare;
     residents += t.p;
-    savedW += v * saved;
+    savedW += base * saved;
+    newTripW += extra * miles;
     n++;
   }
   const visits = shifted + induced;
@@ -190,9 +205,10 @@ export function forecastNewSite(lon: number, lat: number, type: ShelfType, tract
     seniors: se,
     catchmentResidents: residents,
     catchmentTracts: n,
-    milesSavedPerVisit: visits ? savedW / visits : 0,
+    milesSavedPerVisit: shifted ? savedW / shifted : 0,
     reach,
-    perMile: distanceAssociation().perMile,
+    assumedAdditionalVisitsPct: assumptions.additionalVisitsPct,
+    newVisitMiles: induced ? newTripW / induced : 0,
     stateRatesUsed: stateUsed,
   };
 }
@@ -211,8 +227,11 @@ export function evaluateSite(opts: {
   money?: MoneyAssumptions;
   feiTracts?: FeiTract[];
   manual?: { visits: number; pounds: number } | null;
+  assumptions?: SiteAssumptions;
 }): SiteEvaluation {
-  const forecast = forecastNewSite(opts.lon, opts.lat, opts.type);
+  const assumptions = opts.assumptions ?? DEFAULT_SITE_ASSUMPTIONS;
+  validateAssumptions(assumptions);
+  const forecast = forecastNewSite(opts.lon, opts.lat, opts.type, research.tracts, assumptions);
   const visits = opts.manual ? opts.manual.visits : Math.round(forecast.visits);
   const pounds = opts.manual ? opts.manual.pounds : Math.round(forecast.pounds);
   // Manual sizes scale the induced share in proportion so dollar values stay consistent.
@@ -228,6 +247,9 @@ export function evaluateSite(opts: {
       money: opts.money ?? DEFAULT_MONEY[opts.type],
       milesSavedPerVisit: forecast.milesSavedPerVisit,
       inducedPoundsPerMonth: pounds * inducedShare,
+      shiftedVisitsPerMonth: forecast.visits > 0 ? Math.min(visits, visits * (forecast.shifted / forecast.visits)) : 0,
+      additionalPoundsPerMonth: pounds * assumptions.additionalSupplyPct / 100,
+      newVisitMiles: forecast.newVisitMiles,
     },
     opts.feiTracts ?? [],
   );
@@ -266,7 +288,7 @@ export const OBJECTIVES: { id: Objective; label: string; detail: string; icon: s
   {
     id: "value",
     label: "Most net new value",
-    detail: "Food reaching new visits plus household travel cost avoided, per year.",
+    detail: "Assumed additional food plus avoided travel, less travel for additional visits, per year.",
     icon: "dollar",
   },
 ];
@@ -310,11 +332,16 @@ export interface OptimizeOptions {
   spacingMiles?: number;
   onProgress?: (share: number) => void;
   signal?: { cancelled: boolean };
+  assumptions?: SiteAssumptions;
+  manual?: { visits: number; pounds: number } | null;
 }
 
 /** Candidates are tract geometry centroids (never shelf points), skipping tracts already within half a mile of a shelf.
  * Every candidate is scored with the same engine the planner shows; picks keep a minimum spacing. */
 export async function optimizeSites(o: OptimizeOptions): Promise<Candidate[]> {
+  if ((o.objective === "fei" || o.objective === "topq") && (!feiReady || o.feiTracts.length < 100)) {
+    throw new Error("Load the FEI tract data before ranking by FEI. Choose a reach objective while it loads.");
+  }
   const scope = o.counties?.length ? new Set(o.counties) : null;
   const pool = research.tracts.filter((t) => (!scope || scope.has(t.c)) && t.d != null && t.d > 0.5);
   const scored: Omit<Candidate, "rank">[] = [];
@@ -322,7 +349,7 @@ export async function optimizeSites(o: OptimizeOptions): Promise<Candidate[]> {
   for (let i = 0; i < pool.length; i += chunk) {
     if (o.signal?.cancelled) return [];
     for (const t of pool.slice(i, i + chunk)) {
-      const evaluation = evaluateSite({ lon: t.x, lat: t.y, county: t.c, type: o.type, money: o.money, feiTracts: o.feiTracts });
+      const evaluation = evaluateSite({ lon: t.x, lat: t.y, county: t.c, type: o.type, money: o.money, feiTracts: o.feiTracts, assumptions: o.assumptions, manual: o.manual });
       scored.push({ geoid: t.g, county: t.c, lon: t.x, lat: t.y, score: objectiveScore(o.objective, evaluation), evaluation });
     }
     o.onProgress?.(Math.min(1, (i + chunk) / pool.length));

@@ -77,10 +77,11 @@ export function shelfOutlook(shelf: Shelf, all: ShelfReport[], asOf: string): Sh
     3,
   );
   const available =
-    latest?.inventory_lbs != null ? latest.inventory_lbs + (receipts ?? 0) : null;
+    latest?.month === asOf && latest.inventory_lbs != null && receipts != null
+      ? latest.inventory_lbs + receipts : null;
   const coverage = available != null && pounds?.yhat ? available / pounds.yhat : null;
   const daysOfSupply =
-    latest?.inventory_lbs != null && pounds?.yhat
+    latest?.month === asOf && latest.inventory_lbs != null && pounds?.yhat
       ? latest.inventory_lbs / (pounds.yhat / daysInMonth(target))
       : null;
   const base = trailingMean(series("households"), target, 6);

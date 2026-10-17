@@ -7,11 +7,21 @@ let cache: Promise<FeiTractPayload> | null = null;
 
 /** Tract FEI rows and outlines (≈1 MB) load only on pages that need them. */
 export function loadFeiTracts(): Promise<FeiTractPayload> {
-  cache ??= fetch("/data/fei-tracts.json").then((r) => {
-    if (!r.ok) throw new Error(`fei-tracts.json: HTTP ${r.status}`);
-    return r.json() as Promise<FeiTractPayload>;
-  });
+  cache ??= fetch("/data/fei-tracts.json")
+    .then((r) => {
+      if (!r.ok) throw new Error(`fei-tracts.json: HTTP ${r.status}`);
+      return r.json() as Promise<FeiTractPayload>;
+    })
+    .catch((e) => {
+      cache = null;
+      throw e;
+    });
   return cache;
+}
+
+/** Start the 1 MB tract download as soon as the app opens so /present maps are not blank. */
+export function prefetchMapPayloads(): void {
+  if (feiReady) void loadFeiTracts().catch(() => {});
 }
 
 export function useFeiTracts(): { data: FeiTractPayload | null; error: string | null } {

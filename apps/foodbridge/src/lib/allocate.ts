@@ -67,12 +67,16 @@ export function allocate(counties: County[], input: AllocationInput): Allocation
       remainder: exact - Math.floor(exact),
       forecast: yhat,
       upper80: c.forecast.PoundsTotal!.hi80,
-      demandPounds: Math.round(available * demandShare),
+      demandPounds: Math.floor(available * demandShare),
+      demandRemainder: available * demandShare - Math.floor(available * demandShare),
     };
   });
   const left = available - rows.reduce((s, r) => s + r.pounds, 0);
   const ordered = [...rows].sort((a, b) => b.remainder - a.remainder || a.fips.localeCompare(b.fips));
   for (let i = 0; i < left; i++) ordered[i].pounds += 1;
+  const demandLeft = available - rows.reduce((s, r) => s + r.demandPounds, 0);
+  const demandOrder = [...rows].sort((a, b) => b.demandRemainder - a.demandRemainder || a.fips.localeCompare(b.fips));
+  for (let i = 0; i < demandLeft; i++) demandOrder[i].demandPounds += 1;
   return {
     total,
     reserve,
@@ -80,6 +84,6 @@ export function allocate(counties: County[], input: AllocationInput): Allocation
     reservePounds,
     available,
     forecastTotal,
-    rows: rows.sort((a, b) => b.pounds - a.pounds).map(({ remainder: _r, ...r }) => r),
+    rows: rows.sort((a, b) => b.pounds - a.pounds).map(({ remainder: _r, demandRemainder: _d, ...r }) => r),
   };
 }

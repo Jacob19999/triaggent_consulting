@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent, type ReactNode } from "react";
 import { BrandMark } from "@/components/AppShell";
 import { useData } from "@/components/DataProvider";
 import { GeoMap, type MapMarker } from "@/components/map/GeoMap";
@@ -17,7 +17,6 @@ import {
   LineStory,
   linearTicks,
   niceStep,
-  PaceStory,
   RampKey,
   Scatter,
   StepTabs,
@@ -31,7 +30,8 @@ import { TYPE_COLOR, TYPE_GLYPH, TYPE_SHORT } from "@/components/siteTypeStyle";
 import { setThemePref, useTheme } from "@/components/theme";
 import { Badge, buttonClass, cx, Icon } from "@/components/ui";
 import { useSitePoints } from "@/components/useSitePoints";
-import { monthDays, monthLabel } from "@/lib/calendar";
+import { monthLabel } from "@/lib/calendar";
+import { classifyDeckGesture, isDeckControl } from "@/lib/deckGestures";
 import { deck } from "@/lib/deck";
 import { fmt } from "@/lib/format";
 import type { TractRow } from "@/lib/mapLayers";
@@ -43,12 +43,16 @@ import {
   FIRST_APPENDIX,
   MAIN_SLIDES,
   MODEL_LABEL,
+  scriptSeconds,
   SLIDES,
   SPEAKER_COLOR,
   statewideRunRate,
   TALK_SECONDS,
+  WORDS_PER_MINUTE,
   type SlideMeta,
+  type Speaker,
 } from "@/lib/presentation";
+import { PRESENTER_DETAILS } from "@/lib/presentationNotes";
 import { makeScale } from "@/lib/ramps";
 import { countiesByFips, research, SIGNAL_FIELD, SIGNAL_LABEL } from "@/lib/research";
 import type { ForecastSignal, GeoJSONGeometry, Pillar, Signal } from "@/lib/types";
@@ -94,6 +98,7 @@ const PILLAR_PLAIN: Record<Pillar, string> = {
   M: "Hard to get there: households without a car",
   V: "More vulnerable households: children, household make-up",
 };
+
 
 /* ------------------------------------------------------------------ steps */
 
@@ -265,26 +270,43 @@ function SlideMap({
   outlines?: boolean;
 }) {
   const theme = useTheme();
+  const waiting = !geometry || !Object.keys(geometry).length;
+  const countyScale = useMemo(
+    () => makeScale(research.counties.map((c) => c.fei?.fei ?? null), "risk", theme, { domain: [0, 100] }),
+    [theme],
+  );
+  const countyFill = useCallback(
+    (id: string) => {
+      const v = countiesByFips[id]?.fei?.fei;
+      return v == null || !Number.isFinite(v) ? null : countyScale.color(v);
+    },
+    [countyScale],
+  );
   return (
     <div className="flex h-full min-h-0 flex-col overflow-hidden rounded-2xl border border-line bg-[var(--map-bg)]">
       <div className="relative min-h-0 flex-1">
         <div className="absolute inset-0">
-          {geometry ? (
-            <GeoMap
-              geometry={geometry}
-              fill={fill}
-              dim={dim}
-              outlines={outlines ? research.geometry : undefined}
-              markers={markers}
-              hatch={hatch}
-              basemap={theme === "dark" ? "dark" : "light"}
-              hoverCard={hoverCard}
-              ariaLabel={ariaLabel}
-              fitPadding={[8, 44, 8, 8]}
-            />
-          ) : (
-            <div className="grid h-full place-items-center text-[13px] text-muted">Loading census tracts…</div>
-          )}
+          <GeoMap
+            geometry={waiting ? research.geometry : geometry}
+            fill={waiting ? countyFill : fill}
+            dim={waiting ? undefined : dim}
+            outlines={waiting || !outlines ? undefined : research.geometry}
+            markers={waiting ? undefined : markers}
+            hatch={waiting ? undefined : hatch}
+            basemap={theme === "dark" ? "dark" : "light"}
+            hoverCard={
+              waiting
+                ? (id) => (
+                    <div>
+                      <div className="font-semibold text-ink">{countiesByFips[id]?.name ?? id} County</div>
+                      <div className="mt-1 text-[12px] text-muted">Census tracts loading…</div>
+                    </div>
+                  )
+                : hoverCard
+            }
+            ariaLabel={ariaLabel}
+            fitPadding={[8, 44, 8, 8]}
+          />
         </div>
       </div>
       <div className="flex shrink-0 flex-wrap items-center gap-x-5 gap-y-1.5 border-t border-line bg-surface px-4 py-2">
@@ -485,7 +507,7 @@ function FeiSlide() {
               </>
             ) : (
               <>
-                <b className="text-ink">Need × access:</b> one 0–100 score per tract, high only where both are high. Red = most barriers.
+                <b className="text-ink">Need × access:</b> one 0–100 score per tract, emphasizing joint need and access barriers. Red = most barriers.
               </>
             )
           }
@@ -800,7 +822,7 @@ function Q1Slide() {
                     </span>
                   ))}
                 </div>
-                <p className="mt-2 text-[13.5px] text-ink-2">Steele, Rice and Olmsted are regional hubs that also serve neighbouring counties.</p>
+                <p className="mt-2 text-[13.5px] text-ink-2">Steele, Rice and Olmsted may draw regional catchments; client origins are not available to test that explanation.</p>
               </Panel>
             </div>
           )}
@@ -885,7 +907,7 @@ function DivergenceSlide() {
       kicker="Where need and demand disagree, and what explains it"
       title={
         <>
-          Where it is harder to get to a shelf, <Hl hot>fewer low-income residents show up</Hl>. That is need not turning into demand.
+          Higher travel and mobility barriers accompany <Hl hot>lower recorded activity</Hl>. The pattern calls for local checks.
         </>
       }
       monday={{ decision: "Measurement", text: "call these counties first about hours, transport and language before moving supply; a flag is a call, not a verdict." }}
@@ -966,7 +988,7 @@ function Q8Slide() {
       kicker="Low-income, low-access tracts and network reach"
       title={
         <>
-          Food shelves <Hl hot>repeat the grocery gap</Hl> instead of filling it: low-access tracts are less likely to have a shelf, and farther from one.
+          Low-grocery-access rural tracts are <Hl hot>farther from reporting food shelves</Hl>; presence alone is weaker evidence.
         </>
       }
       monday={{ decision: "Siting", text: "check catchments, hours and mobile stops in low-access tracts with no shelf before opening anything new." }}
@@ -1088,7 +1110,7 @@ function Q4Slide() {
       kicker="Food prices and food-shelf activity"
       title={
         <>
-          Grocery prices are a <Hl>weak</Hl> early warning: only individuals served follow them, a month later. The calendar matters more.
+          The price link is <Hl>fragile</Hl>: an individuals association changes with the study window. The calendar helps planning.
         </>
       }
       monday={{ decision: "Allocation", text: "warn shelves on the calendar and recent trend; don't promise donors a county surge from prices alone." }}
@@ -1103,7 +1125,7 @@ function Q4Slide() {
           </div>
         </div>
         <div className="flex min-h-0 flex-col gap-3">
-          <Answer n={1} title="Do more people come when prices rise? Right away or later?" active={step === 0} summary={`Only individuals served, about +${fmt.num(prices[2].cumulative_elasticity, 0)}% a month later; visits and pounds show no clear change.`}>
+          <Answer n={1} title="Do more people come when prices rise? Right away or later?" active={step === 0} summary={`Tentative individuals association: about +${fmt.num(prices[2].cumulative_elasticity, 0)}% a month later, sensitive to early 2022.`}>
 
             <div className="flex flex-col gap-2">
               {prices.map((r) => {
@@ -1120,7 +1142,7 @@ function Q4Slide() {
               })}
             </div>
           </Answer>
-          <Answer n={2} title="What cycles remain after prices?" active={step === 1} summary={`Working days: each extra day adds about ${fmt.num(wd.HouseholdsTotal.pct_per_day, 1)}–${fmt.num(wd.PoundsTotal.pct_per_day, 1)}% to a month.`}>
+          <Answer n={2} title="What cycles remain after prices?" active={step === 1} summary={`Working days: each extra day is associated with about ${fmt.num(wd.HouseholdsTotal.pct_per_day, 1)}–${fmt.num(wd.PoundsTotal.pct_per_day, 1)}% to a month.`}>
 
             <div className="text-[13px] font-semibold text-ink">Each extra working day in a month adds</div>
             <div className="mt-1.5">
@@ -1216,41 +1238,53 @@ function Q5Slide() {
   );
 }
 
-/* ------------------------------------------------------------------ 10–11 · Q7 */
+/* ------------------------------------------------------------------ 10 · Q7 */
 
 const SUBMITTED: ForecastSignal[] = ["HouseholdsTotal", "PoundsTotal", "ChildrenTotal", "AdultsTotal", "SeniorsTotal"];
 
-function Q7ResultSlide() {
+function Q7Slide() {
   const state = Object.fromEntries(st.q7_state.map((r) => [r.signal, r.yhat])) as Record<string, number>;
   const visits = state.HouseholdsTotal;
   const july = research.history.find((h) => h.month === research.meta.observed_end)?.HouseholdsTotal ?? null;
   const points = research.history.filter((h) => h.month >= "2024-01").map((h) => ({ month: h.month, value: h.HouseholdsTotal }));
-  const bt = st.q7_backtest.filter((r) => r.signal === "HouseholdsTotal");
-  const rmse = (m: string) => bt.find((r) => r.model === m)?.rmse ?? null;
-  const naive = rmse("seasonal_naive");
-  const ours = rmse("recent3_weighted");
+  const rmse = (s: ForecastSignal, m: string) => st.q7_backtest.find((r) => r.signal === s && r.model === m)?.rmse ?? null;
+  const naive = rmse("HouseholdsTotal", "seasonal_naive");
+  const ours = rmse("HouseholdsTotal", "recent3_weighted");
   const times = naive && ours ? Math.round(naive / ours) : null;
-  const bars = (["seasonal_naive", "july_naive", "recent3_weighted"] as const).flatMap((m) => {
-    const v = rmse(m);
-    return v == null ? [] : [{ label: m === "recent3_weighted" ? "Our run rate (submitted)" : MODEL_LABEL[m], value: v, color: m === "recent3_weighted" ? "var(--accent)" : "var(--line-strong)", strong: m === "recent3_weighted" }];
-  });
+  const ml = deck.q7_ml.rmse;
+  const mlWins = SUBMITTED.filter((s) => ml[s].ml < ml[s].submitted);
+  const rr = statewideRunRate("HouseholdsTotal");
   return (
     <Frame
-      meta={meta("q7-result")}
-      kicker="August 2026 forecast, as submitted"
+      meta={meta("q7")}
+      kicker="August 2026 prepared forecast"
       title={
         <>
           August: about <Hl>{fmt.compact(visits)} visits</Hl> and {fmt.compact(state.PoundsTotal)} pounds, with county error {times ? `about ${times}× smaller` : "far below"} than “repeat last August”.
         </>
       }
-      monday={{ decision: "Allocation", text: "set August orders from each county's forecast; the shelf portal shows the same number to the shelf." }}
-      method="root mean squared county error over the August 2023–2025 folds (the scoring metric); the same folds chose the model, so this is development error"
-      source="outputs/submission/Graduate_Predictions_Submit.csv (team G08, 87 counties); q7_backtest.csv"
+      monday={{ decision: "Allocation", text: "use the historical forecast to demonstrate planning; verify current reporting before setting orders." }}
+      method="recent3_weighted (D-045), applied per county and field. Error: root mean squared county error over the August 2023–2025 folds (the scoring metric); the same folds chose the model, so this is development error. ML: one fixed gradient-boosting configuration (mi.forecast_ml), same folds and counties"
+      source="outputs/submission/Graduate_Predictions_Submit.csv (team G08, 87 counties); q7_eval.md; q7_backtest.csv; q7_ml_eval.md; no August 2026 actual is used (mi.guards)"
     >
-      <div className="grid h-full min-h-0 grid-cols-[1.4fr_1fr] gap-5">
+      <div className="flex h-full min-h-0 flex-col gap-3">
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-1 rounded-2xl border border-line bg-surface px-4 py-2.5 text-[14px] text-ink-2">
+          <span className="text-[12px] font-semibold uppercase tracking-[0.08em] text-muted">The rule</span>
+          <span>Visits per working day</span>
+          {rr.steps.map((s) => (
+            <span key={s.month} className="tabular">
+              <b className="text-[16px] text-ink">{fmt.int(s.perDay)}</b> <span className="text-muted">{monthLabel(s.month, "short").split(" ")[0]}</span>{" "}
+              <span className="rounded bg-[var(--accent)] px-1 text-[12px] font-semibold text-[var(--accent-ink)]">×{s.weight}</span>
+            </span>
+          ))}
+          <span>
+            → weighted pace <b className="tabular text-ink">{fmt.int(rr.perDay)} a day</b> × <b className="text-ink">{rr.targetDays} working days</b>, in every county and field
+          </span>
+        </div>
+        <div className="grid min-h-0 flex-1 grid-cols-[1.05fr_1fr] gap-5">
         <div className="flex min-h-0 flex-col rounded-2xl border border-line bg-surface p-3">
           <div className="flex items-baseline justify-between gap-2 px-1">
-            <span className="text-[13px] font-semibold text-ink">Statewide visits per month, with the August forecast</span>
+            <span className="text-[13px] font-semibold text-ink">Statewide visits per month</span>
             <span className="tabular text-[12.5px] text-ink-2">
               July {fmt.int(july)} → August {fmt.int(visits)} ({fmt.signedPct(july ? visits / july - 1 : null, 1)})
             </span>
@@ -1274,51 +1308,55 @@ function Q7ResultSlide() {
             />
           </div>
         </div>
-        <div className="flex min-h-0 flex-col gap-3">
-          <Panel title="What we submitted (sum of 87 counties)">
-            <ul className="divide-y divide-[var(--line)]">
-              {SUBMITTED.map((s) => (
-                <li key={s} className="flex items-baseline justify-between gap-3 py-[3px]">
-                  <span>
-                    <span className="text-[15px] font-medium text-ink">{SIGNAL_LABEL[s]}</span> <span className="text-[11.5px] text-muted">{SIGNAL_FIELD[s]}</span>
-                  </span>
-                  <span className="tabular text-[18px] font-semibold text-ink">
-                    <CountUp value={state[s]} />
-                  </span>
-                </li>
-              ))}
-            </ul>
-            <p className="mt-1 text-[12px] text-muted">Graduate addendum: children + adults + seniors add up to individuals in every county. Wilkin = 0 (no reporting shelf).</p>
-          </Panel>
-          <Panel title="County error in visits, last three Augusts · lower is better" className="flex-1">
-            <CompareBars rows={bars} format={(v) => fmt.int(v)} delay={200} compact />
+        <div className="flex min-h-0 flex-col">
+          <Panel title="Prepared file (87 counties) and development error" className="flex-1">
+            <table className="tabular w-full">
+              <thead>
+                <tr className="text-right align-bottom text-[11.5px] leading-tight text-muted">
+                  <th className="pb-1 text-left font-medium">Field</th>
+                  <th className="pb-1 pl-2 font-medium">Submitted</th>
+                  <th className="pb-1 pl-3 font-semibold text-accent">
+                    Error,
+                    <br />
+                    our rule
+                  </th>
+                  <th className="pb-1 pl-3 font-medium">
+                    Error,
+                    <br />
+                    ML model
+                  </th>
+                  <th className="pb-1 pl-3 font-medium">
+                    Repeat
+                    <br />
+                    last Aug.
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {SUBMITTED.map((s) => (
+                  <tr key={s} className="border-t border-line text-right">
+                    <td className="py-[5px] text-left leading-tight">
+                      <span className="text-[15px] font-medium text-ink">{SIGNAL_LABEL[s]}</span> <span className="text-[11px] text-muted">{SIGNAL_FIELD[s]}</span>
+                    </td>
+                    <td className="py-[5px] pl-2 text-[17px] font-semibold text-ink">
+                      <CountUp value={state[s]} />
+                    </td>
+                    <td className="py-[5px] pl-3 text-[15px] font-semibold text-accent">{fmt.int(ml[s].submitted)}</td>
+                    <td className={cx("py-[5px] pl-3 text-[15px]", ml[s].ml < ml[s].submitted ? "font-semibold text-ink" : "text-ink-2")}>{fmt.int(ml[s].ml)}</td>
+                    <td className="py-[5px] pl-3 text-[15px] text-muted">{fmt.int(rmse(s, "seasonal_naive"))}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            <p className="mt-2 text-[12px] leading-snug text-muted">
+              Error: root mean squared county error over the last three Augusts, the scoring metric; lower is better. A gradient-boosting ML model beat our rule only on{" "}
+              {mlWins.length ? mlWins.map((s) => SIGNAL_LABEL[s].toLowerCase()).join(" and ") : "no field"}, so we retained the rule.
+            </p>
+            <p className="mt-1 text-[12px] leading-snug text-muted">Graduate addendum: children + adults + seniors add up to individuals in every county. Wilkin = 0 (no reporting shelf).</p>
           </Panel>
         </div>
+        </div>
       </div>
-    </Frame>
-  );
-}
-
-function Q7MethodSlide() {
-  const { step } = useStep();
-  const rr = statewideRunRate("HouseholdsTotal");
-  const submitted = st.q7_state.find((r) => r.signal === "HouseholdsTotal")?.yhat;
-  return (
-    <Frame
-      meta={meta("q7-method")}
-      kicker="How the forecast works"
-      title={
-        <>
-          A rule a manager can redo by hand: recent <Hl>pace per working day</Hl>, weighted toward July, times August's working days.
-        </>
-      }
-      monday={{ decision: "Allocation", text: "plan August supply on 21 working days, not July's 22." }}
-      method={`recent3_weighted (D-045), chosen on squared error over August 2023–2025; shown statewide, applied per county and field (county sum ${fmt.int(submitted)})`}
-      source="q7_eval.md, q7_august2026_wide.csv; no August 2026 actual is used (mi.guards)"
-    >
-      {rr.perDay != null && rr.yhat != null && (
-        <PaceStory steps={rr.steps} perDay={rr.perDay} target={rr.target} days={monthDays(rr.target)} yhat={rr.yhat} stage={step} unit="visits" />
-      )}
     </Frame>
   );
 }
@@ -1329,9 +1367,9 @@ function DemoSlide() {
   const { setRole } = useData();
   const stops = [
     { who: "Roshit", time: "12 s", href: "/manager", role: "manager" as const, icon: "dashboard", title: "Command center", q: "Q1 · Q7", what: "Click a county: its 24-month trend, the August forecast, its sites by type and open alerts." },
-    { who: "Roshit", time: "8 s", href: "/shelf", role: "shelf" as const, icon: "store", title: "Food shelf portal", q: "Q7", what: "The monthly report in the network's own fields, and next month's forecast for the shelf itself." },
+    { who: "Roshit", time: "8 s", href: "/shelf", role: "shelf" as const, icon: "store", title: "Food shelf portal", q: "Q7", what: "A sample county network's report and next-month forecast, in the sponsor's fields." },
     { who: "Jacob", time: "12 s", href: "/manager/scenarios", role: "manager" as const, icon: "target", title: "Site planner", q: "Q8 · Q6", what: "Place a shelf in a high-barrier county: residents brought within reach and the driving time." },
-    { who: "Jacob", time: "8 s", href: "/manager/allocation", role: "manager" as const, icon: "truck", title: "Supply allocation", q: "Q1 · Q6", what: "Split a supply pool by need and barriers instead of by visits alone, and see which counties gain." },
+    { who: "Jacob", time: "8 s", href: "/manager/allocation", role: "manager" as const, icon: "truck", title: "Supply allocation", q: "Q1 · Q6", what: "Compare a hypothetical split by forecast pounds and a chosen need weight; the draft conserves the pool." },
   ];
   return (
     <Frame
@@ -1342,7 +1380,7 @@ function DemoSlide() {
           The same evidence, in the tool staff would open on <Hl>Monday morning</Hl>.
         </>
       }
-      monday={{ decision: "All four", text: "managers allocate and site from one screen; each shelf sees its own forecast and reports in the same fields." }}
+      monday={{ decision: "All four", text: "managers compare scenarios; the sample portal shows county-network reports and forecasts." }}
       source="county and tract aggregates only; forecasts labelled; the AI briefing retrieves and cites figures and never computes one. Browser Back returns here."
     >
       <div className="grid h-full grid-cols-2 content-center gap-4">
@@ -1381,10 +1419,10 @@ function DemoSlide() {
 
 function CloseSlide() {
   const cols = [
-    { d: "Allocate", icon: "truck", q: "Q1 · Q6 · Q7", text: "Split supply by barriers as well as visits; order August on each county's forecast." },
+    { d: "Allocate", icon: "truck", q: "Q1 · Q6 · Q7", text: "Compare activity, need screens and reporting before changing supply. August is a historical planning example." },
     { d: "Site", icon: "pin", q: "Q8 · Q6", text: `Check the ${priorityNames.length} priority counties and shelf-less low-access tracts first; test a site in the planner.` },
-    { d: "Argue", icon: "scale", q: "Q5 · Q4", text: "SNAP and shelves move together: protect SNAP, and ask DCYF for advance notice of benefit gaps." },
-    { d: "Measure", icon: "index", q: "Q6", text: "Report barriers next to visits, so results are judged on who still can't reach food." },
+    { d: "Argue", icon: "scale", q: "Q5 · Q4", text: "Use the observed SNAP co-movement to discuss coordination and advance notice; no policy effect is estimated." },
+    { d: "Measure", icon: "index", q: "Q6", text: "Track reporting, access and uptake separately; test service changes with household evidence." },
   ];
   return (
     <Frame
@@ -1392,7 +1430,7 @@ function CloseSlide() {
       kicker="What changes on Monday"
       title={
         <>
-          The Food Group can't see need directly. It can see <Hl>where barriers keep need from becoming demand</Hl>, and act on it.
+          The Food Group can <Hl>identify places to investigate</Hl>, test local explanations, and measure what changes.
         </>
       }
       source="FEI and the Q6 score are screening measures, not counts of unmet people; nothing here is a causal effect; every number is reproduced from code in the team repository."
@@ -1464,8 +1502,8 @@ function AppendixQ7() {
     <Frame
       meta={meta("a-q7")}
       kicker="Appendix · Q7 back-test"
-      title="The submitted run rate beats every simple baseline in all six fields."
-      source="Root mean squared county error over the August 2023/2024/2025 folds (q7_backtest.csv), sponsor units. Coverage: share of counties inside the band in August 2025 (q7_interval_coverage.csv); nominal bands, not guaranteed probabilities."
+      title="The selected run rate has lower aggregate development error than the displayed simple baselines."
+      source="Root mean squared county error over the August 2023/2024/2025 folds (q7_backtest.csv), sponsor units. Gradient-boosting ML: one fixed configuration on the same folds and counties (mi.forecast_ml, q7_ml_eval.md). Coverage: share of counties inside the band in August 2025 (q7_interval_coverage.csv); nominal bands, not guaranteed probabilities."
     >
       <div className="h-full overflow-auto">
         <table className="tabular w-full text-[14.5px]">
@@ -1477,6 +1515,7 @@ function AppendixQ7() {
                   {MODEL_LABEL[m]}
                 </th>
               ))}
+              <th className="py-1.5 pr-3 text-right font-medium">Gradient-boosting ML (tested, not submitted)</th>
               <th className="py-1.5 text-right font-medium">80% band coverage, Aug 2025</th>
             </tr>
           </thead>
@@ -1494,6 +1533,7 @@ function AppendixQ7() {
                     </td>
                   );
                 })}
+                <td className="py-2 pr-3 text-right text-ink-2">{fmt.int(deck.q7_ml.rmse[s]?.ml)}</td>
                 <td className="py-2 text-right text-ink-2">{fmt.pct(cov.find((c) => c.signal === s)?.coverage80, 0)}</td>
               </tr>
             ))}
@@ -1517,7 +1557,7 @@ function AppendixFei() {
     <Frame
       meta={meta("a-fei")}
       kicker="Appendix · FEI validation and stability"
-      title="FEI agrees with need signals it never used, and its ranking survives re-weighting."
+      title="FEI agrees with external need signals; shared drivers and supply choices still matter."
       source="fei_validation.csv (bootstrap Spearman ρ, 95% intervals; the Map the Meal Gap comparison is published as ρ only, D-050) and fei_sensitivity.csv."
     >
       <div className="grid h-full grid-cols-2 gap-6 overflow-auto">
@@ -1621,8 +1661,7 @@ const VIEWS: Record<string, () => ReactNode> = {
   q8: Q8Slide,
   q4: Q4Slide,
   q5: Q5Slide,
-  "q7-method": Q7MethodSlide,
-  "q7-result": Q7ResultSlide,
+  q7: Q7Slide,
   demo: DemoSlide,
   close: CloseSlide,
   "a-q6": AppendixQ6,
@@ -1630,6 +1669,134 @@ const VIEWS: Record<string, () => ReactNode> = {
   "a-fei": AppendixFei,
   "a-sources": AppendixSources,
 };
+
+/* ------------------------------------------------------------------ speaker notes */
+
+type NotesTab = "script" | "qa";
+const NOTE_LABEL = "text-[11.5px] font-semibold uppercase tracking-[0.08em] text-muted";
+const SPEAKER_TAG = /^(Jacob|Daniela|Biruk|Roshit):$/;
+
+/** The script with silent [cues] muted and each "Name:" hand-over on its own line. */
+function ScriptText({ text }: { text: string }) {
+  return (
+    <>
+      {text.split(/(\[[^\]]*\]|\b(?:Jacob|Daniela|Biruk|Roshit):)/).map((part, j) => {
+        if (part.startsWith("[")) {
+          return (
+            <span key={j} className="text-[13.5px] italic text-muted">
+              {part}
+            </span>
+          );
+        }
+        if (SPEAKER_TAG.test(part)) {
+          return (
+            <span key={j}>
+              {j > 1 && <br />}
+              <b style={{ color: SPEAKER_COLOR[part.slice(0, -1) as Speaker] }}>{part}</b>
+            </span>
+          );
+        }
+        return part;
+      })}
+    </>
+  );
+}
+
+/** Script, build cues and judge answers for the slide on screen (N opens the script, Q the judge Q&A). */
+function SpeakerNotes({ m, tab, onTab, target, onClose }: { m: SlideMeta; tab: NotesTab; onTab: (t: NotesTab) => void; target: number; onClose: () => void }) {
+  const detail = PRESENTER_DETAILS[m.id];
+  const spoken = scriptSeconds(m.script);
+  const over = !m.appendix && spoken > m.seconds + 3;
+  return (
+    <aside id="speaker-notes" aria-label="Presenter notes" className="h-[min(36dvh,320px)] shrink-0 overflow-y-auto overscroll-contain border-t border-line bg-surface px-4 pb-5 sm:px-8">
+      <div className="sticky top-0 z-10 flex flex-wrap items-center gap-2 border-b border-line bg-surface py-2 text-[13px]">
+        <span className="font-semibold text-ink">{m.speakers.join(" + ")}</span>
+        {m.appendix ? (
+          <span className="text-muted">Appendix: only if a judge asks</span>
+        ) : (
+          <span className="tabular text-muted">
+            {clock(m.seconds)} on this slide · finish by {clock(target)}
+          </span>
+        )}
+        <div role="group" aria-label="Note view" className="flex rounded-lg bg-surface-2 p-0.5">
+          {(["script", "qa"] as const).map((t) => (
+            <button
+              key={t}
+              aria-pressed={tab === t}
+              onClick={() => onTab(t)}
+              className={cx("min-h-11 rounded-md px-3 text-[14px] font-semibold", tab === t ? "bg-surface text-ink shadow-[var(--shadow)]" : "text-muted hover:text-ink")}
+            >
+              {t === "script" ? "Script" : `Judge Q&A · ${m.qa.length}`}
+            </button>
+          ))}
+        </div>
+        <span className="flex-1" />
+        <button onClick={onClose} aria-label="Close presenter notes" className="min-h-11 rounded-lg px-3 text-[14px] font-semibold text-ink hover:bg-surface-2">Close</button>
+      </div>
+
+      <p className="mt-2 text-[12px] text-muted">Tap Script or Q&amp;A. Notes are visible if this screen is mirrored.</p>
+      {tab === "script" ? (
+        <div className="mt-2.5 grid gap-x-8 gap-y-3 lg:grid-cols-[1.2fr_1fr]">
+          <div>
+            <div className="flex flex-wrap items-baseline justify-between gap-x-3">
+              <span className={NOTE_LABEL}>Timed script</span>
+              <span className={cx("tabular text-[11.5px]", over ? "font-semibold text-[var(--critical-text)]" : "text-muted")}>
+                ≈ {clock(spoken)} at {WORDS_PER_MINUTE} words a minute{!m.appendix && ` · budget ${clock(m.seconds)}`}
+              </span>
+            </div>
+            <p className="mt-2 text-[17px] leading-relaxed text-ink">
+              <ScriptText text={m.script} />
+            </p>
+            {detail && <div className="mt-5 space-y-3 border-t border-line pt-4">
+              <h3 className={NOTE_LABEL}>Expanded explanation · for rehearsal or follow-up</h3>
+              {detail.explain.map((p) => <p key={p} className="text-[16px] leading-relaxed text-ink-2">{p}</p>)}
+              <p className="rounded-lg bg-surface-2 p-3 text-[16px] leading-relaxed text-ink"><b>Transition:</b> {detail.transition}</p>
+            </div>}
+          </div>
+          <div className="space-y-3">
+            <div>
+              <span className={NOTE_LABEL}>Build cues</span>
+              <ul className="mt-1 list-disc space-y-1 pl-5 text-[13.5px] leading-snug text-ink-2">
+                {m.notes.map((n) => (
+                  <li key={n}>{n}</li>
+                ))}
+              </ul>
+            </div>
+            {m.watch && m.watch.length > 0 && (
+              <div className="rounded-xl border border-[var(--warning)] bg-surface-2 px-3 py-2">
+                <span className="flex items-center gap-1.5 text-[11.5px] font-semibold uppercase tracking-[0.08em] text-[var(--warning-text)]">
+                  <Icon name="warning" className="h-3.5 w-3.5" /> Qualify aloud
+                </span>
+                <ul className="mt-1 list-disc space-y-1 pl-5 text-[13px] leading-snug text-ink-2">
+                  {m.watch.map((w) => (
+                    <li key={w}>{w}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
+          </div>
+        </div>
+      ) : (
+        <ol key={m.id} className="mt-3 grid items-start gap-3 lg:grid-cols-2">
+          {m.qa.map((x, j) => (
+            <li key={x.q}>
+              <article className="rounded-xl border border-line bg-surface-2 p-4">
+                <h3 className="flex items-start gap-2 text-[16px] font-semibold leading-snug text-ink">
+                  <span className="tabular mt-px grid h-5 w-5 shrink-0 place-items-center rounded-full bg-[var(--accent-soft)] text-[11px] font-bold text-accent">{j + 1}</span>
+                  <span className="flex-1">{x.q}</span>
+                </h3>
+                <p className="mt-3 text-[16px] leading-relaxed text-ink-2">{x.a}</p>
+                {x.src && <p className="mt-1 pl-7 text-[11.5px] text-muted">Numbers: {x.src}</p>}
+              </article>
+            </li>
+          ))}
+        </ol>
+      )}
+
+      {m.files.length > 0 && <p className="mt-2 text-[11.5px] text-muted">Slide numbers from: {m.files.join(" · ")}</p>}
+    </aside>
+  );
+}
 
 /* ------------------------------------------------------------------ deck */
 
@@ -1646,13 +1813,32 @@ export default function Presentation() {
   const [i, setI] = useState(0);
   const [step, setStep] = useState(0);
   const [notes, setNotes] = useState(false);
+  const [notesTab, setNotesTab] = useState<NotesTab>("script");
   const [startedAt, setStartedAt] = useState<number | null>(null);
   const [now, setNow] = useState(() => Date.now());
 
   // The slide lives in the URL hash, so the browser Back button returns here after a demo stop.
-  useEffect(() => setI(slideFromHash()), []);
+  // Do not write #1 on the first paint: that clobbers /present#3 before slideFromHash runs.
+  const hashReady = useRef(false);
   useEffect(() => {
-    window.history.replaceState(null, "", `#${i + 1}`);
+    const start = slideFromHash();
+    setI(start);
+    const onHash = () => setI(slideFromHash());
+    window.addEventListener("hashchange", onHash);
+    const boot = window.setTimeout(() => {
+      hashReady.current = true;
+      const want = `#${start + 1}`;
+      if (window.location.hash !== want) window.history.replaceState(null, "", want);
+    }, 0);
+    return () => {
+      window.removeEventListener("hashchange", onHash);
+      window.clearTimeout(boot);
+    };
+  }, []);
+  useEffect(() => {
+    if (!hashReady.current) return;
+    const want = `#${i + 1}`;
+    if (window.location.hash !== want) window.history.replaceState(null, "", want);
   }, [i]);
   useEffect(() => {
     if (startedAt == null) return;
@@ -1672,12 +1858,77 @@ export default function Presentation() {
   );
   const forward = useCallback(() => (step < stepsOf(i) - 1 ? setStep(step + 1) : go(i + 1)), [step, i, go]);
   const back = useCallback(() => (step > 0 ? setStep(step - 1) : i > 0 ? go(i - 1, -1) : undefined), [step, i, go]);
+  const atStart = i === 0 && step === 0;
+  const atEnd = i === SLIDES.length - 1 && step === stepsOf(i) - 1;
+  // A finger on the slide does what a click does: tap advances, swipe left/right turns the page.
+  // Presses that start on a link or button are left alone so those controls still activate.
+  const press = useRef<{ id: number; x: number; y: number; control: boolean } | null>(null);
+  const swallowClick = useRef<((ev: Event) => void) | null>(null);
+  const clearSwallow = useCallback(() => {
+    if (!swallowClick.current) return;
+    window.removeEventListener("click", swallowClick.current, true);
+    swallowClick.current = null;
+  }, []);
+  const onStagePointerDown = useCallback((e: ReactPointerEvent<HTMLElement>) => {
+    if (!e.isPrimary || (e.pointerType === "mouse" && e.button !== 0)) return;
+    clearSwallow();
+    const control = isDeckControl(e.target);
+    press.current = { id: e.pointerId, x: e.clientX, y: e.clientY, control };
+    if (!control) {
+      try {
+        e.currentTarget.setPointerCapture(e.pointerId);
+      } catch {
+        // The pointer can already be gone on a very fast tap.
+      }
+    }
+  }, [clearSwallow]);
+  const onStagePointerUp = useCallback(
+    (e: ReactPointerEvent<HTMLElement>) => {
+      const p = press.current;
+      press.current = null;
+      if (!p || p.id !== e.pointerId || p.control) return;
+      const move = classifyDeckGesture(e.clientX - p.x, e.clientY - p.y);
+      if (move === "forward" && !atEnd) forward();
+      else if (move === "back" && !atStart) back();
+      else return;
+      if (e.pointerType === "mouse") return;
+      // Touch also synthesizes a click. Swallow that click so a swipe ending on a link does not open it.
+      const stopClick = (ev: Event) => {
+        ev.preventDefault();
+        ev.stopPropagation();
+        clearSwallow();
+      };
+      swallowClick.current = stopClick;
+      window.addEventListener("click", stopClick, true);
+      window.setTimeout(() => {
+        if (swallowClick.current === stopClick) clearSwallow();
+      }, 700);
+    },
+    [atEnd, atStart, forward, back, clearSwallow],
+  );
+  const onStagePointerCancel = useCallback(() => {
+    press.current = null;
+  }, []);
+  /** Open the notes on a tab, or close them when that tab is already showing. */
+  const toggleNotes = useCallback(
+    (tab: NotesTab) => {
+      if (notes && notesTab === tab) setNotes(false);
+      else {
+        setNotes(true);
+        setNotesTab(tab);
+      }
+    },
+    [notes, notesTab],
+  );
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       const tag = (e.target as HTMLElement | null)?.tagName;
       if (tag === "INPUT" || tag === "SELECT" || tag === "TEXTAREA" || e.metaKey || e.ctrlKey || e.altKey) return;
       const k = e.key.toLowerCase();
+      // Let buttons activate with Space and let the notes panel scroll with arrows.
+      if (tag === "BUTTON" && (k === " " || k === "enter")) return;
+      if ((e.target as HTMLElement | null)?.closest("#speaker-notes") && ["arrowdown", "arrowup", "pagedown", "pageup", " "].includes(k)) return;
       if (["arrowright", "pagedown", " "].includes(k)) {
         e.preventDefault();
         forward();
@@ -1687,7 +1938,8 @@ export default function Presentation() {
       else if (k === "home") go(0);
       else if (k === "end") go(MAIN_SLIDES.length - 1);
       else if (k === "a") go(FIRST_APPENDIX);
-      else if (k === "n") setNotes((v) => !v);
+      else if (k === "n") toggleNotes("script");
+      else if (k === "q") toggleNotes("qa");
       else if (k === "t") {
         setStartedAt(Date.now());
         setNow(Date.now());
@@ -1698,7 +1950,7 @@ export default function Presentation() {
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [forward, back, go, i]);
+  }, [forward, back, go, i, toggleNotes]);
 
   const m = SLIDES[i];
   const View = VIEWS[m.id];
@@ -1709,12 +1961,12 @@ export default function Presentation() {
 
   return (
     <div className="fb-deck flex h-dvh flex-col bg-[var(--rail)]">
-      <header className="flex h-11 shrink-0 items-center gap-3 border-b border-line bg-surface px-4">
+      <header className="flex min-h-14 shrink-0 items-center gap-2 border-b border-line bg-surface px-3">
         <Link href="/" className="flex items-center gap-2 text-[13.5px] font-semibold text-ink" title="Back to FoodBridge home">
           <BrandMark className="h-6 w-6" /> FoodBridge
         </Link>
         <span className="hidden text-[12.5px] text-muted sm:inline">· {m.part}</span>
-        <div className="mx-2 flex h-2 flex-1 items-center gap-[3px]" aria-label="Talk progress">
+        <div className="mx-2 hidden h-2 flex-1 items-center gap-[3px] lg:flex" aria-label="Talk progress">
           {MAIN_SLIDES.map((s, j) => (
             <button
               key={s.id}
@@ -1735,7 +1987,7 @@ export default function Presentation() {
             />
           ))}
         </div>
-        <span className="tabular text-[12.5px] text-muted">
+        <span className="tabular ml-auto text-[12.5px] text-muted lg:ml-0">
           {m.appendix ? `A${i - FIRST_APPENDIX + 1}` : `${i + 1} / ${MAIN_SLIDES.length}`}
           {m.steps && ` · step ${step + 1}/${m.steps.length}`}
         </span>
@@ -1749,61 +2001,50 @@ export default function Presentation() {
         >
           {clock(elapsed)} / {clock(target)}
         </button>
-        <button onClick={() => setNotes((v) => !v)} className={cx(buttonClass("ghost", "sm"), notes && "bg-surface-2")} title="Speaker notes (N)">
-          Notes
+        <button onClick={() => toggleNotes("script")} aria-controls="speaker-notes" aria-expanded={notes && notesTab === "script"} className={cx("min-h-11 rounded-lg px-3 text-[14px] font-semibold text-ink", notes && notesTab === "script" ? "bg-[var(--accent-soft)]" : "hover:bg-surface-2")} title="Speaker script (optional shortcut: N)">
+          Script
+        </button>
+        <button onClick={() => toggleNotes("qa")} aria-controls="speaker-notes" aria-expanded={notes && notesTab === "qa"} className={cx("min-h-11 rounded-lg px-3 text-[14px] font-semibold text-ink", notes && notesTab === "qa" ? "bg-[var(--accent-soft)]" : "hover:bg-surface-2")} title="Judge Q&A (optional shortcut: Q)">
+          Q&A
         </button>
         <button
           onClick={() => setThemePref(theme === "dark" ? "light" : "dark")}
-          className="grid h-8 w-8 place-items-center rounded-lg text-muted hover:bg-surface-2"
+          className="hidden h-11 w-11 place-items-center rounded-lg text-muted hover:bg-surface-2 sm:grid"
           aria-label="Switch theme"
         >
           <Icon name={theme === "dark" ? "sun" : "moon"} />
         </button>
         <button
           onClick={() => (document.fullscreenElement ? void document.exitFullscreen() : void document.documentElement.requestFullscreen?.())}
-          className="grid h-8 w-8 place-items-center rounded-lg text-muted hover:bg-surface-2"
+          className="hidden h-11 w-11 place-items-center rounded-lg text-muted hover:bg-surface-2 sm:grid"
           aria-label="Full screen (F)"
         >
           <Icon name="expand" />
         </button>
       </header>
 
-      <main id="main" className="relative min-h-0 flex-1">
+      <main
+        id="main"
+        className="fb-deck-stage relative min-h-0 flex-1"
+        onPointerDownCapture={onStagePointerDown}
+        onPointerUpCapture={onStagePointerUp}
+        onPointerCancelCapture={onStagePointerCancel}
+      >
         <Stage>
           <StepCtx.Provider value={ctx}>
             <View key={m.id} />
           </StepCtx.Provider>
         </Stage>
-        <button onClick={back} disabled={i === 0 && step === 0} aria-label="Previous" className="absolute inset-y-0 left-0 w-6 opacity-0 hover:bg-white/5 hover:opacity-100 disabled:hidden" />
-        <button
-          onClick={forward}
-          disabled={i === SLIDES.length - 1 && step === stepsOf(i) - 1}
-          aria-label="Next"
-          className="absolute inset-y-0 right-0 w-6 opacity-0 hover:bg-white/5 hover:opacity-100 disabled:hidden"
-        />
       </main>
 
-      {notes && (
-        <aside className="max-h-[34vh] shrink-0 overflow-y-auto border-t border-line bg-surface px-6 py-3 sm:px-10">
-          <div className="flex flex-wrap items-center gap-3 text-[13px]">
-            <span className="font-semibold text-ink">{m.speakers.join(" + ")}</span>
-            {!m.appendix && (
-              <span className="tabular text-muted">
-                {clock(m.seconds)} on this slide · finish by {clock(target)}
-              </span>
-            )}
-            {m.appendix && <span className="text-muted">Appendix: only if a judge asks</span>}
-            <span className="flex-1" />
-            <span className="text-[11.5px] text-muted">→ next step · ↓ skip to next slide · A appendix · T restart clock · F full screen · N hide notes</span>
-          </div>
-          <ul className="mt-2 list-disc space-y-1 pl-5 text-[14px] text-ink-2">
-            {m.notes.map((n) => (
-              <li key={n}>{n}</li>
-            ))}
-          </ul>
-          {m.files.length > 0 && <p className="mt-2 text-[11.5px] text-muted">Numbers from: {m.files.join(" · ")}</p>}
-        </aside>
-      )}
+      <nav aria-label="Slide navigation" className="flex shrink-0 items-center justify-center gap-3 border-t border-line bg-surface px-3 py-1">
+        <button onClick={back} disabled={i === 0 && step === 0} className="min-h-11 rounded-lg px-3 text-[14px] font-semibold text-ink hover:bg-surface-2 disabled:opacity-35">Previous</button>
+        <select aria-label="Go to slide" value={i} onChange={(e) => go(Number(e.target.value))} className="min-h-11 min-w-0 max-w-[50vw] rounded-lg border border-line bg-surface px-2 text-[14px] text-ink">
+          {SLIDES.map((s, j) => <option key={s.id} value={j}>{s.appendix ? `A${j - FIRST_APPENDIX + 1}` : j + 1}. {PRESENTER_DETAILS[s.id]?.label ?? s.part}</option>)}
+        </select>
+        <button onClick={forward} disabled={i === SLIDES.length - 1 && step === stepsOf(i) - 1} className="min-h-11 rounded-lg px-3 text-[14px] font-semibold text-ink hover:bg-surface-2 disabled:opacity-35">{step < stepsOf(i) - 1 ? "Next build" : "Next slide"}</button>
+      </nav>
+      {notes && <SpeakerNotes key={`${m.id}-${notesTab}`} m={m} tab={notesTab} onTab={setNotesTab} target={target} onClose={() => setNotes(false)} />}
     </div>
   );
 }

@@ -4,7 +4,9 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useState, t
 import { computeAlerts, type Alert, type ShelfOutlook } from "@/lib/alerts";
 import { lastFullMonth } from "@/lib/calendar";
 import { liveAvailable } from "@/lib/config";
+import { prefetchMapPayloads } from "@/lib/feiTracts";
 import { NETWORK_AS_OF } from "@/lib/networks";
+import { fetchSitePoints } from "@/lib/sitePoints";
 import { DemoStore, SupabaseStore, type Snapshot, type Store } from "@/lib/store";
 import { browserSupabase } from "@/lib/supabase/client";
 import type { AlertState, Role } from "@/lib/types";
@@ -136,6 +138,13 @@ export function DataProvider({ children }: { children: ReactNode }) {
     };
     void init();
   }, [load]);
+
+  // Tract outlines and shelf points are lazy ~1 MB JSON. Start them on the first page so
+  // /present and the command-center maps are not an empty "Loading census tracts…" box.
+  useEffect(() => {
+    prefetchMapPayloads();
+    void fetchSitePoints().catch(() => {});
+  }, []);
 
   // Default the portal to the first shelf the user can see.
   useEffect(() => {

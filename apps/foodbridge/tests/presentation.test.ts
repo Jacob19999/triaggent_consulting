@@ -4,6 +4,7 @@ import {
   MAIN_SLIDES,
   SLIDES,
   TALK_SECONDS,
+  scriptSeconds,
   speakerSeconds,
   statewideRunRate,
 } from "@/lib/presentation";
@@ -13,7 +14,7 @@ describe("judging talk run sheet", () => {
   it("fits a 5–7 minute spoken slot with room for interruptions", () => {
     expect(TALK_SECONDS).toBeGreaterThanOrEqual(5 * 60);
     expect(TALK_SECONDS).toBeLessThanOrEqual(6 * 60);
-    expect(MAIN_SLIDES).toHaveLength(13);
+    expect(MAIN_SLIDES).toHaveLength(12);
   });
 
   it("gives every presenter a spoken beat", () => {
@@ -34,8 +35,7 @@ describe("judging talk run sheet", () => {
       "q8",
       "q4",
       "q5",
-      "q7-result",
-      "q7-method",
+      "q7",
       "demo",
       "close",
     ]);
@@ -43,8 +43,7 @@ describe("judging talk run sheet", () => {
     expect(lead.title).toEqual(["Jacob"]);
     expect(lead.fei).toEqual(["Jacob"]);
     for (const id of ["fei-map", "q6", "q1", "divergence", "q8", "q4", "q5"]) expect(lead[id]).toEqual(["Daniela"]);
-    expect(lead["q7-result"]).toEqual(["Biruk"]);
-    expect(lead["q7-method"]).toEqual(["Biruk"]);
+    expect(lead.q7).toEqual(["Biruk"]);
     expect(lead.demo).toEqual(["Roshit", "Jacob"]);
     expect(lead.close).toEqual(["Jacob"]);
   });
@@ -69,6 +68,20 @@ describe("judging talk run sheet", () => {
     expect(steps.q5).toEqual(["Together or substitutes?", "When benefits change", "Does it differ by place?"]);
     expect(steps.q8).toHaveLength(3);
     expect(steps.q6).toHaveLength(2);
+  });
+
+  it("gives every slide a script and judge answers", () => {
+    for (const s of SLIDES) {
+      expect(s.script.trim().length, s.id).toBeGreaterThan(0);
+      expect(s.qa.length, s.id).toBeGreaterThanOrEqual(s.appendix ? 2 : 3);
+      for (const x of s.qa) expect(x.q.length * x.a.length, `${s.id}: ${x.q}`).toBeGreaterThan(0);
+    }
+  });
+
+  it("keeps the spoken script inside the talk budget", () => {
+    const spoken = MAIN_SLIDES.reduce((t, s) => t + scriptSeconds(s.script), 0);
+    expect(spoken).toBeLessThanOrEqual(TALK_SECONDS);
+    expect(scriptSeconds("[Click.] Roshit: one two three. Jacob: four.")).toBeCloseTo((60 * 4) / 130);
   });
 
   it("keeps appendix slides for judges who ask, without adding spoken time", () => {

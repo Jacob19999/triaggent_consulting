@@ -33,11 +33,13 @@ import { countiesByFips, EQUITY_SHORT, feiReady, research } from "@/lib/research
 import { ASSUMPTION_NOTES, DEFAULT_MONEY, type MoneyAssumptions } from "@/lib/scenario";
 import {
   evaluateSite,
+  DEFAULT_SITE_ASSUMPTIONS,
   HUFF_EXPONENT,
   OBJECTIVES,
   optimizeSites,
   TYPE_REACH,
-  UPLIFT_CAP,
+  MAX_ADDITIONAL_VISITS_PCT,
+  type SiteAssumptions,
   type Candidate,
   type Objective,
 } from "@/lib/siteModel";
@@ -149,6 +151,9 @@ export default function SitePlanner() {
   const [sizing, setSizing] = useState<"auto" | "manual">("auto");
   const [manual, setManual] = useState({ visits: 150, pounds: 8000 });
   const [money, setMoney] = useState<MoneyAssumptions>(DEFAULT_MONEY.brick_and_mortar);
+  const [assumptions, setAssumptions] = useState<SiteAssumptions>(DEFAULT_SITE_ASSUMPTIONS);
+  const [saveError, setSaveError] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
   const [name, setName] = useState("");
   const [saved, setSaved] = useState<string | null>(null);
   const [view, setView] = useState<View>("today");
@@ -165,12 +170,26 @@ export default function SitePlanner() {
   const [spacing, setSpacing] = useState(15);
   const [running, setRunning] = useState(false);
   const [progress, setProgress] = useState(0);
+  const [searchMessage, setSearchMessage] = useState<string | null>(null);
   const [candidates, setCandidates] = useState<Candidate[]>([]);
   const [activeRank, setActiveRank] = useState<number | null>(null);
   const cancel = useRef<{ cancelled: boolean } | null>(null);
+  const hasSearched = useRef(false);
   const [tab, setTab] = useState<SideTab>("plan");
 
   useEffect(() => setMoney(DEFAULT_MONEY[type]), [type]);
+
+  useEffect(() => {
+    if (cancel.current) cancel.current.cancelled = true;
+    setRunning(false);
+    setCandidates([]);
+    setActiveRank(null);
+    if (hasSearched.current) {
+      setSearchMessage("Settings changed. Run the search to rank options with these assumptions.");
+      setSite((current) => current?.label.startsWith("Option") ? { ...current, label: "Selected location · settings changed" } : current);
+    }
+    return () => { if (cancel.current) cancel.current.cancelled = true; };
+  }, [objective, type, money, assumptions, scopeKind, scopeCounty, spacing, sizing, manual]);
 
   const placeAt = useCallback((lon: number, lat: number, label?: string) => {
     const fips = countyAt(lon, lat);
@@ -195,21 +214,24 @@ export default function SitePlanner() {
     }
   }, []);
 
-  const evaluation = useMemo(() => {
-    if (!site) return null;
-    return evaluateSite({
-      lon: site.lon,
-      lat: site.lat,
-      county: site.fips,
-      type,
-      money,
-      feiTracts: tracts.rows ?? [],
-      manual: sizing === "manual" ? manual : null,
-    });
-  }, [site, type, money, tracts.rows, sizing, manual]);
+  const { evaluation, evaluationError } = useMemo(() => {
+    if (!site) return { evaluation: null, evaluationError: null };
+    try {
+      return {
+        evaluation: evaluateSite({
+          lon: site.lon, lat: site.lat, county: site.fips, type, money, assumptions,
+          feiTracts: tracts.rows ?? [], manual: sizing === "manual" ? manual : null,
+        }),
+        evaluationError: null,
+      };
+    } catch (e) {
+      return { evaluation: null, evaluationError: e instanceof Error ? e.message : String(e) };
+    }
+  }, [site, type, money, assumptions, tracts.rows, sizing, manual]);
 
   const result = evaluation?.result ?? null;
   const fc = evaluation?.forecast ?? null;
+  const saveKey = JSON.stringify({ input: result?.input, assumptions, name });
   const drive = useDriveReach(site, tracts.rows);
   const candidateSites = useMemo(() => candidates.map((c) => ({ lon: c.lon, lat: c.lat })), [candidates]);
   const candidateDrive = useDriveReachMany(candidateSites, tracts.rows);
@@ -286,11 +308,13 @@ export default function SitePlanner() {
 
   const runOptimizer = async () => {
     if (!tracts.rows) return;
+    hasSearched.current = true;
     cancel.current && (cancel.current.cancelled = true);
     const signal = { cancelled: false };
     cancel.current = signal;
     setRunning(true);
     setProgress(0);
+    setSearchMessage(null);
     setCandidates([]);
     setActiveRank(null);
     const scope =
@@ -299,55 +323,74 @@ export default function SitePlanner() {
         : scopeKind === "topq"
           ? research.counties.filter((c) => (c.fei?.quintile ?? 0) === 5).map((c) => c.fips)
           : [];
-    const picks = await optimizeSites({
-      objective,
-      type,
-      money,
-      feiTracts: tracts.rows,
-      counties: scope,
-      count: 5,
-      spacingMiles: spacing,
-      onProgress: setProgress,
-      signal,
-    });
-    if (signal.cancelled) return;
-    setRunning(false);
-    setCandidates(picks);
-    if (picks[0]) {
-      setActiveRank(1);
-      setSite({ lon: picks[0].lon, lat: picks[0].lat, fips: picks[0].county, label: "Option 1" });
-      setView("change");
-      setFocusState(boxAround(picks, 25));
+    try {
+      const picks = await optimizeSites({
+        objective,
+        type,
+        money,
+        assumptions,
+        manual: sizing === "manual" ? manual : null,
+        feiTracts: tracts.rows,
+        counties: scope,
+        count: 5,
+        spacingMiles: spacing,
+        onProgress: setProgress,
+        signal,
+      });
+      if (signal.cancelled) return;
+      setRunning(false);
+      setCandidates(picks);
+      setSearchMessage(picks.length ? null : "No improving options under these settings. Try a wider area, another objective, or place a site manually.");
+      if (picks[0]) {
+        setActiveRank(1);
+        setSite({ lon: picks[0].lon, lat: picks[0].lat, fips: picks[0].county, label: "Option 1" });
+        setView("change");
+        setFocusState(boxAround(picks, 25));
+      }
+    } catch (e) {
+      if (!signal.cancelled) setSearchMessage(e instanceof Error ? e.message : String(e));
+    } finally {
+      if (!signal.cancelled) setRunning(false);
     }
   };
 
   const save = async () => {
     if (!result || !site || !fc) return;
-    await store.saveScenario({
-      name: name || `${TYPES.find((t) => t.id === type)?.label} · ${county?.name} County`,
-      kind: "new_shelf",
-      payload: {
-        input: result.input,
-        summary: {
-          county: county?.name,
-          feiCountyBefore: result.fei.countyBefore ?? null,
-          feiCountyAfter: result.fei.countyAfter ?? null,
-          residentsNewlyWithin: result.residentsNewlyWithin,
-          residentsCloser: result.residentsCloser,
-          forecastVisits: Math.round(fc.visits),
-          forecastPounds: Math.round(fc.pounds),
-          annualCost: result.dollars.annualCost,
-          foodValue: result.dollars.foodValue,
-          travelSavings: result.dollars.travelSavings,
-          netNewValue: result.dollars.netNewValue,
-          driveResidentsCloser: drive.reach?.residentsCloser ?? null,
-          driveMinutesSaved: drive.reach?.avgMinutesSaved ?? null,
-          driveResidentsNewlyWithin: drive.reach?.residentsNewlyWithin ?? null,
+    setSaving(true);
+    setSaveError(null);
+    try {
+      await store.saveScenario({
+        name: name || `${TYPES.find((t) => t.id === type)?.label} · ${county?.name} County`,
+        kind: "new_shelf",
+        payload: {
+          input: result.input,
+          assumptions,
+          methodVersion: "scenario-assumptions-v2",
+          summary: {
+            county: county?.name,
+            feiCountyBefore: result.fei.countyBefore ?? null,
+            feiCountyAfter: result.fei.countyAfter ?? null,
+            residentsNewlyWithin: result.residentsNewlyWithin,
+            residentsCloser: result.residentsCloser,
+            forecastVisits: result.input.householdsPerMonth,
+            forecastPounds: result.input.poundsPerMonth,
+            annualCost: result.dollars.annualCost,
+            foodValue: result.dollars.foodValue,
+            travelSavings: result.dollars.travelSavings,
+            netNewValue: result.dollars.netNewValue,
+            driveResidentsCloser: drive.reach?.residentsCloser ?? null,
+            driveMinutesSaved: drive.reach?.avgMinutesSaved ?? null,
+            driveResidentsNewlyWithin: drive.reach?.residentsNewlyWithin ?? null,
+          },
         },
-      },
-    });
-    await refresh();
-    setSaved("Saved");
+      });
+      await refresh();
+      setSaved(saveKey);
+    } catch (e) {
+      setSaveError(`Could not save: ${e instanceof Error ? e.message : String(e)}`);
+    } finally {
+      setSaving(false);
+    }
   };
 
   const exportCandidates = () =>
@@ -359,9 +402,12 @@ export default function SitePlanner() {
           county: countiesByFips[c.county]?.name,
           tract_geoid: c.geoid,
           objective,
+          additional_visits_pct: assumptions.additionalVisitsPct,
+          additional_supply_pct: assumptions.additionalSupplyPct,
+          method_version: "scenario-assumptions-v2",
           score: Math.round(c.score * 100) / 100,
-          forecast_visits_month: Math.round(c.evaluation.forecast.visits),
-          forecast_PoundsReg_month: Math.round(c.evaluation.forecast.pounds),
+          scenario_visits_month: c.evaluation.result.input.householdsPerMonth,
+          scenario_PoundsReg_month: c.evaluation.result.input.poundsPerMonth,
           residents_newly_within: Math.round(c.evaluation.result.residentsNewlyWithin),
           county_fei_before: c.evaluation.result.fei.countyBefore?.toFixed(2) ?? "",
           county_fei_after: c.evaluation.result.fei.countyAfter?.toFixed(2) ?? "",
@@ -445,14 +491,13 @@ export default function SitePlanner() {
                     {rural ? "10 mi (LILA) and 30 mi" : "1 mi (LILA) and 10 mi"}
                   </p>
                 </div>
-                <Button size="sm" variant="secondary" onClick={save}>
-                  <Icon name="save" /> {saved ?? "Save"}
+                <Button size="sm" variant="secondary" onClick={save} disabled={saving}>
+                  <Icon name="save" /> {saving ? "Saving…" : saved === saveKey ? "Saved" : "Save"}
                 </Button>
               </div>
               <div className="mt-3 grid grid-cols-2 gap-2">
                 <Kpi
                   icon="users"
-                  tone="forecast"
                   label="Visits"
                   value={fmt.int(sizing === "manual" ? manual.visits : fc.visits)}
                   sub={sizing === "manual" ? "Per month · your size" : `Per month · range ${fmt.int(fc.visitsLo)}–${fmt.int(fc.visitsHi)}`}
@@ -467,7 +512,7 @@ export default function SitePlanner() {
                 <Kpi icon="pin" label="New in reach" value={fmt.int(result.residentsNewlyWithin)} sub={`${fmt.int(result.lowIncomeNewlyWithin)} below 200% of poverty`} />
                 <Kpi
                   icon="dollar"
-                  label="New value / yr"
+                  label="Scenario value / yr"
                   value={fmt.usd(result.dollars.netNewValue)}
                   sub={`${fmt.usd(result.dollars.newValuePerDollar, 2)} per $1 of cost · gross ${fmt.usd(result.dollars.valuePerDollar, 2)}`}
                 />
@@ -477,12 +522,12 @@ export default function SitePlanner() {
               )}
             </div>
 
-            <Block title="Forecast activity" icon="history" aside={<ForecastBadge />}>
-              <p className="mb-2 text-[11.5px] text-muted">Per month at August 2026 rates. Visits = HouseholdsReg; pounds = PoundsReg.</p>
+            <Block title="Scenario activity" icon="history" aside={<Badge>Assumptions</Badge>}>
+              <p className="mb-2 text-[11.5px] text-muted">Historical planning example at August 2026 forecast rates. Site activity and ranges are unvalidated scenarios. Visits = HouseholdsReg; pounds = PoundsReg.</p>
               <StackedBar
                 parts={[
                   { key: "s", label: "Shifted from today's shelves", value: fc.shifted * (sizing === "manual" && fc.visits ? manual.visits / fc.visits : 1), color: "var(--seq-3)" },
-                  { key: "i", label: "New visits from closer access", value: fc.induced * (sizing === "manual" && fc.visits ? manual.visits / fc.visits : 1), color: "var(--accent)" },
+                  { key: "i", label: "Assumed additional visits", value: fc.induced * (sizing === "manual" && fc.visits ? manual.visits / fc.visits : 1), color: "var(--accent)" },
                 ]}
                 format={(v) => fmt.int(v)}
               />
@@ -504,17 +549,18 @@ export default function SitePlanner() {
                 <div className="mb-1 text-[11px] font-medium text-muted">Individuals by age (ChildrenReg · AdultsReg · SeniorsReg)</div>
                 <StackedBar
                   parts={[
-                    { key: "c", label: "Children", value: fc.children, color: "var(--age-children)" },
-                    { key: "a", label: "Adults", value: fc.adults, color: "var(--age-adults)" },
-                    { key: "s", label: "Seniors", value: fc.seniors, color: "var(--age-seniors)" },
+                    { key: "c", label: "Children", value: fc.children * (sizing === "manual" && fc.visits ? manual.visits / fc.visits : 1), color: "var(--age-children)" },
+                    { key: "a", label: "Adults", value: fc.adults * (sizing === "manual" && fc.visits ? manual.visits / fc.visits : 1), color: "var(--age-adults)" },
+                    { key: "s", label: "Seniors", value: fc.seniors * (sizing === "manual" && fc.visits ? manual.visits / fc.visits : 1), color: "var(--age-seniors)" },
                   ]}
                   format={(v) => fmt.int(v)}
                 />
               </div>
               <SourceNote>
                 Rates: {county.name} County&apos;s August 2026 forecast per resident (D-045)
-                {fc.stateRatesUsed ? "; counties without a forecast use the state rate" : ""}. Closer access adds{" "}
-                {fmt.num(-fc.perMile * 100, 1)}% visits per mile saved (cross-county association, 2024), capped.
+                {fc.stateRatesUsed ? "; counties without a forecast use the state rate" : ""}.
+                Additional visits: {fc.assumedAdditionalVisitsPct}% of shifted visits, an editable assumption.
+                Additional network food: {assumptions.additionalSupplyPct}% of site pounds. Relocation losses at existing sites are not modelled.
               </SourceNote>
             </Block>
 
@@ -555,7 +601,7 @@ export default function SitePlanner() {
             </Block>
 
             <Block title="Access and reach" icon="pin">
-              <Line k={`Newly within ${rural ? "10 miles" : "1 mile"} (USDA threshold)`} v={fmt.int(result.residentsNewlyWithin)} strong />
+              <Line k="Newly within 1 mile urban / 10 miles rural" v={fmt.int(result.residentsNewlyWithin)} strong />
               <Line k="… of them below 200% of poverty (county share)" v={fmt.int(result.lowIncomeNewlyWithin)} />
               <Line k="… of them children (county share)" v={fmt.int(result.childrenNewlyWithin)} />
               <Line k="Residents whose nearest shelf gets closer" v={fmt.int(result.residentsCloser)} />
@@ -574,7 +620,7 @@ export default function SitePlanner() {
             >
               {drive.status === "ready" && drive.reach ? (
                 <>
-                  <Line k={`Newly within ${rural ? "10" : "1"} road mile${rural ? "s" : ""}`} v={fmt.int(drive.reach.residentsNewlyWithin)} strong />
+                  <Line k="Newly within 1 road mile urban / 10 rural" v={fmt.int(drive.reach.residentsNewlyWithin)} strong />
                   <Line k="Residents whose nearest shelf by road gets closer" v={fmt.int(drive.reach.residentsCloser)} />
                   <Line k="Average drive saved (those residents)" v={`${fmt.num(drive.reach.avgMinutesSaved, 1)} min · ${fmt.num(drive.reach.avgMilesSaved, 1)} mi`} />
                   <Line k={`Residents within ${DRIVE_MINUTES_RING} minutes' drive`} v={fmt.int(drive.reach.residentsWithin15Min)} />
@@ -599,7 +645,7 @@ export default function SitePlanner() {
               <ValueBars
                 rows={[
                   { label: "Food distributed at the site (wholesale)", value: result.dollars.foodValue, color: "var(--seq-3)", note: `${fmt.int(result.dollars.annualPounds)} lb · ${fmt.int(result.dollars.annualMeals)} meals` },
-                  { label: "Net new value", value: result.dollars.netNewValue, color: "var(--accent)", note: `${fmt.usd(result.dollars.newFoodValue)} food for new visits + ${fmt.usd(result.dollars.travelSavings)} travel avoided` },
+                  { label: "Scenario additional value", value: result.dollars.netNewValue, color: "var(--accent)", note: `${fmt.usd(result.dollars.newFoodValue)} additional food + ${fmt.usd(result.dollars.travelSavings)} travel avoided − ${fmt.usd(result.dollars.additionalTravelCost)} additional travel` },
                   { label: "Annual cost (operating + start-up spread)", value: result.dollars.annualCost, color: "var(--serious)" },
                 ]}
               />
@@ -657,8 +703,8 @@ export default function SitePlanner() {
               </details>
               <SourceNote>
                 Gross value counts all food at the site; most of it would otherwise be picked up elsewhere. Net new value counts only
-                food for visits that do not happen today plus round-trip miles saved × the IRS rate. Estimates for comparing options,
-                not measured impact.
+                additional food for assumed new visits, plus avoided travel for shifted visits, less travel for new visits.
+                Operating costs are placeholders. Estimates for comparing assumptions, not measured impact.
               </SourceNote>
             </Block>
 
@@ -789,7 +835,12 @@ export default function SitePlanner() {
               <Button className="w-full" size="lg" onClick={runOptimizer} disabled={running || !tracts.rows}>
                 <Icon name="bolt" /> {running ? "Searching tracts…" : tracts.rows ? "Find the 5 best sites" : "Loading tracts…"}
               </Button>
-              {running && <Progress value={progress} label="Search progress" />}
+              {running && <><Progress value={progress} label="Search progress" /><Button variant="secondary" onClick={() => {
+                if (cancel.current) cancel.current.cancelled = true;
+                setRunning(false); setSearchMessage("Search cancelled. Adjust settings or run it again.");
+              }}>Cancel search</Button></>}
+              {searchMessage && <p role="status" className="text-[12px] text-ink-2">{searchMessage}</p>}
+              {tracts.error && <p role="alert" className="text-[12px] text-[var(--critical-text)]">Could not load tract data. Reload the page to retry.</p>}
             </div>
             {candidates.length > 0 && (
               <div className="mt-4">
@@ -831,7 +882,7 @@ export default function SitePlanner() {
                               <span className="font-normal text-muted"> · tract {c.geoid.slice(5, 9)}</span>
                             </span>
                             <span className="tabular block text-[11px] text-muted">
-                              {fmt.int(c.evaluation.forecast.visits)} visits/mo · {fmt.compact(r.residentsNewlyWithin)} newly in reach
+                              {fmt.int(r.input.householdsPerMonth)} visits/mo · {fmt.compact(r.residentsNewlyWithin)} newly in reach
                               {r.fei.status === "ready" && ` · FEI −${fmt.num((r.fei.countyBefore ?? 0) - (r.fei.countyAfter ?? 0), 1)}`}
                             </span>
                             <span className="tabular block text-[11px] text-muted">
@@ -892,7 +943,7 @@ export default function SitePlanner() {
             value={sizing}
             onChange={setSizing}
             options={[
-              { value: "auto", label: "Auto from forecast" },
+              { value: "auto", label: "Use county rates" },
               { value: "manual", label: "Set my own" },
             ]}
           />
@@ -923,13 +974,28 @@ export default function SitePlanner() {
           )}
         </div>
 
+        <div className="border-b border-line px-5 py-4">
+          <SectionLabel>What are you assuming?</SectionLabel>
+          <label className="block text-[12px] text-ink-2">
+            Additional visits above shifted visits: {assumptions.additionalVisitsPct}%
+            <input aria-label="Additional visits percent" type="range" min={0} max={MAX_ADDITIONAL_VISITS_PCT} step={5}
+              value={assumptions.additionalVisitsPct} onChange={(e) => setAssumptions({ ...assumptions, additionalVisitsPct: Number(e.target.value) })} className="mt-1 w-full" />
+          </label>
+          <label className="mt-3 block text-[12px] text-ink-2">
+            Site food added to the network: {assumptions.additionalSupplyPct}%
+            <input aria-label="Additional network food percent" type="range" min={0} max={100} step={5}
+              value={assumptions.additionalSupplyPct} onChange={(e) => setAssumptions({ ...assumptions, additionalSupplyPct: Number(e.target.value) })} className="mt-1 w-full" />
+          </label>
+          <p className="mt-2 text-[11.5px] text-muted">Both start at zero. A county correlation cannot tell us how many extra visits a new site creates. Only additional food raises the network supply total.</p>
+        </div>
+
         <div className="px-5 py-4">
           <SourceNote>
             Approximation from tract averages: residents sit at tract centroids; distances are straight lines to the nearest
             reporting shelf (2024 network, validated shelf points, D-064), with driving access loaded separately from the road
             network; FEI change applies the FEI build&apos;s published formulas and bounds. Huff
-            gravity share (exponent {HUFF_EXPONENT}); induced visits from the cross-county distance association, capped at +
-            {Math.round((UPLIFT_CAP - 1) * 100)}%, not causal.
+            gravity share (exponent {HUFF_EXPONENT}); extra visits and supply are user assumptions.
+            Ranked options are alternatives evaluated one at a time, not a joint expansion plan.
           </SourceNote>
         </div>
     </>
@@ -1037,6 +1103,7 @@ export default function SitePlanner() {
           />
         </div>
         <div className="fb-scroll min-h-0 flex-1 overflow-y-auto">
+          {(saveError || evaluationError) && <p role="alert" className="p-4 text-[13px] text-[var(--critical-text)]">{saveError || evaluationError}</p>}
           {tab === "plan" && planContent}
           {tab === "impact" && (
             <>

@@ -129,7 +129,7 @@ export default function ShelfHome() {
           />
           <SourceNote>
             {s.field} {network ? "summed over the county's reporting sites" : "from your monthly reports"}. The open circle is the forecast; dark band 80%, light band 95%. It is a
-            planning range, not a promise.
+            planning range, not a calibrated probability. Default bands are assumptions when there is too little history; reported zeros remain in backtest calibration.
           </SourceNote>
         </Card>
         <div className="space-y-4">

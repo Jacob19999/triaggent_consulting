@@ -1,7 +1,7 @@
 // Extra statistics for the judging deck (/present), written by
 // `uv run python -m mi.foodbridge_bundle --deck` from outputs/tables.
 import raw from "@data/deck.json";
-import type { Signal } from "./types";
+import type { ForecastSignal, Signal } from "./types";
 
 interface Range {
   coef: number;
@@ -22,6 +22,8 @@ export interface DeckFacts {
   q8_presence: Record<"rural_better_access" | "rural_low_access" | "urban_better_access" | "urban_low_access", { tracts: number; with_site: number; share: number }>;
   q8_road: Record<"rural_better_access" | "rural_low_access" | "urban_better_access" | "urban_low_access", { mean_miles: number; share_beyond_10: number }>;
   q6_chance: { flagged: number; flagged_by_chance: number; survivors: number; survivors_by_chance: number };
+  /** Gradient-boosting challenger (mi.forecast_ml) vs the submitted run rate: county RMSE over the August folds. */
+  q7_ml: { run_id: string; model: string; folds: string[]; rmse: Record<ForecastSignal, { ml: number; submitted: number }> };
 }
 
 export const deck = raw as unknown as DeckFacts;

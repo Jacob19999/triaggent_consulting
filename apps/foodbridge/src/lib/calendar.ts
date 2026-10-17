@@ -37,6 +37,8 @@ function holidays(year: number): Set<string> {
   add(8, nthWeekday(year, 8, 1, 1)); // Labor Day
   add(10, nthWeekday(year, 10, 4, 4)); // Thanksgiving
   add(11, 25); // Christmas
+  // Next year's New Year can be observed on this year's December 31.
+  if (new Date(Date.UTC(year + 1, 0, 1)).getUTCDay() === 6) out.add(`${year}-12-31`);
   return out;
 }
 

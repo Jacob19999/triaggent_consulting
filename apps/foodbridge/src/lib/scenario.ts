@@ -163,6 +163,12 @@ export interface NewShelfInput {
   milesSavedPerVisit?: number;
   /** From the site forecast: pounds per month reaching visits that do not happen today. */
   inducedPoundsPerMonth?: number;
+  /** Only food added to the network can increase total supply. Default: none. */
+  additionalPoundsPerMonth?: number;
+  /** Existing visits that move to this site; new visits did not make an old trip. */
+  shiftedVisitsPerMonth?: number;
+  /** One-way travel for additional visits, a cost rather than avoided travel. */
+  newVisitMiles?: number;
 }
 
 export interface TractEffect {
@@ -209,19 +215,20 @@ export interface ScenarioResult {
     annualMeals: number;
     foodValue: number;
     travelSavings: number;
+    additionalTravelCost: number;
     /** Food value reaching visits that do not happen today (induced visits only). */
     newFoodValue: number;
-    /** Travel savings plus new food value: value that would not exist without the site. */
+    /** Assumed additional food value plus avoided travel, less additional travel. */
     netNewValue: number;
     /** Net new value minus annual cost. */
     netValue: number;
     annualCost: number;
-    costPerMeal: number;
-    costPerVisit: number;
+    costPerMeal: number | null;
+    costPerVisit: number | null;
     costPerResidentWithin: number | null;
-    valuePerDollar: number;
+    valuePerDollar: number | null;
     /** Net new value per $1 of cost. */
-    newValuePerDollar: number;
+    newValuePerDollar: number | null;
     costPerFeiPoint: number | null;
   };
 }
@@ -293,10 +300,11 @@ export function feiImpact(input: NewShelfInput, tracts: FeiTract[] = []): {
   const normA = normalizer("lbs_per_lowinc_resident", usable.map((t) => t.A));
   const normD = normalizer("miles_nearest", usable.map((t) => t.d));
   const normBM = normalizer("brick_excess_miles", usable.map((t) => Math.max(0, (t.d_bm ?? t.d!) - theta(t))));
-  const dist = (t: FeiTract) => haversineMiles(t.lon!, t.lat!, input.lon, input.lat);
+  const operating = input.householdsPerMonth > 0 && input.poundsPerMonth > 0;
+  const dist = (t: FeiTract) => operating ? haversineMiles(t.lon!, t.lat!, input.lon, input.lat) : Infinity;
 
-  // 2SFCA: the new shelf's ratio is its own supply over its own catchment demand.
-  const annualSupply = input.poundsPerMonth * 12;
+  // 2SFCA: only assumed additional network food increases catchment supply.
+  const annualSupply = (input.additionalPoundsPerMonth ?? 0) * 12;
   const demand = usable.reduce((s, t) => s + (t.demand ?? 0) * decay(dist(t), isUrban(t)), 0);
   const ratio = demand > 0 ? annualSupply / demand : 0;
   const isFixed = input.type === "brick_and_mortar" || input.type === "tribal" || input.type === "campus";
@@ -346,8 +354,11 @@ export function feiImpact(input: NewShelfInput, tracts: FeiTract[] = []): {
     popAll += pop;
     feiAll += pop * t.fei!;
     feiAllAfter += pop * after;
-    if (t.quintile != null ? t.quintile === 5 : t.fei! >= q80) topBefore += pop;
-    if (after >= q80) topAfter += pop;
+    const wasTop = t.quintile != null ? t.quintile === 5 : t.fei! >= q80;
+    if (wasTop) topBefore += pop;
+    // Rounded FEI can tie across quintile boundaries. A no-op must preserve the
+    // published membership; a non-increasing score cannot enter the top group.
+    if (wasTop && after >= q80) topAfter += pop;
     if (t.county === input.county) {
       popC += pop;
       feiC += pop * t.fei!;
@@ -374,6 +385,19 @@ export function runScenario(
   feiTracts: FeiTract[] = [],
   tracts: Tract[] = research.tracts,
 ): ScenarioResult {
+  const nonnegative = [input.householdsPerMonth, input.poundsPerMonth, ...Object.values(input.money),
+    input.additionalPoundsPerMonth ?? 0, input.shiftedVisitsPerMonth ?? 0,
+    input.inducedPoundsPerMonth ?? 0, input.milesSavedPerVisit ?? 0, input.newVisitMiles ?? 0];
+  if (nonnegative.some((v) => !Number.isFinite(v) || v < 0) || !Number.isFinite(input.lon) || !Number.isFinite(input.lat)) {
+    throw new Error("Enter finite, nonnegative site sizes and budget assumptions.");
+  }
+  if (input.money.lbPerMeal <= 0 || input.money.amortizeYears <= 0) {
+    throw new Error("Pounds per meal and years to spread start-up cost must be greater than zero.");
+  }
+  if ((input.additionalPoundsPerMonth ?? 0) > input.poundsPerMonth || (input.inducedPoundsPerMonth ?? 0) > input.poundsPerMonth ||
+      (input.shiftedVisitsPerMonth ?? 0) > input.householdsPerMonth) {
+    throw new Error("Additional food and shifted visits cannot exceed the site's total.");
+  }
   const affected: TractEffect[] = [];
   let lowIncomeWithin = 0,
     childrenWithin = 0;
@@ -386,7 +410,8 @@ export function runScenario(
     if (t.d == null) continue;
     const theta = thresholdMiles(t);
     const share = theta === 1 ? (t.b1 ?? 0) : (t.b10 ?? 0);
-    const miles = haversineMiles(t.x, t.y, input.lon, input.lat);
+    const miles = input.householdsPerMonth > 0 && input.poundsPerMonth > 0
+      ? haversineMiles(t.x, t.y, input.lon, input.lat) : Infinity;
     const isCounty = t.c === input.county;
     if (isCounty) beyondBefore += t.p * share;
     if (miles >= t.d) {
@@ -416,6 +441,14 @@ export function runScenario(
   const annualPounds = input.poundsPerMonth * 12;
   const before2024 = county?.annual2024.PoundsTotal ?? null;
   const fei = feiImpact(input, feiTracts);
+  // Supply can improve a tract even when the proposed shelf is not its nearest.
+  // Include those changes so the FEI map and the aggregate use the same tracts.
+  const affectedIds = new Set(affected.map((a) => a.geoid));
+  for (const t of tracts) {
+    if (t.d != null && fei.byTract.has(t.g) && !affectedIds.has(t.g)) {
+      affected.push({ geoid: t.g, county: t.c, residents: t.p, milesBefore: t.d, milesAfter: t.d, newlyWithin: 0 });
+    }
+  }
   for (const a of affected) {
     const f = fei.byTract.get(a.geoid);
     if (f) {
@@ -429,10 +462,12 @@ export function runScenario(
   const annualVisits = input.householdsPerMonth * 12;
   const annualMeals = annualPounds / m.lbPerMeal;
   const foodValue = annualPounds * m.valuePerLb;
-  // Visits at the new shelf, each a round trip shortened by the miles saved.
+  // Only shifted visits had an old trip to shorten. Additional visits add travel.
   const savedPerVisit = input.milesSavedPerVisit ?? avgSaved;
-  const travelSavings = annualVisits * m.tripsPerHouseholdMonth * 2 * savedPerVisit * m.mileageRate;
-  const newFoodValue = (input.inducedPoundsPerMonth ?? 0) * 12 * m.valuePerLb;
+  const shiftedVisits = Math.min(input.householdsPerMonth, Math.max(0, input.shiftedVisitsPerMonth ?? 0));
+  const travelSavings = shiftedVisits * 12 * m.tripsPerHouseholdMonth * 2 * savedPerVisit * m.mileageRate;
+  const additionalTravelCost = (input.householdsPerMonth - shiftedVisits) * 12 * m.tripsPerHouseholdMonth * 2 * (input.newVisitMiles ?? 0) * m.mileageRate;
+  const newFoodValue = Math.min(input.inducedPoundsPerMonth ?? 0, input.additionalPoundsPerMonth ?? 0) * 12 * m.valuePerLb;
   const annualCost = m.annualOperatingCost + (m.amortizeYears > 0 ? m.startupCost / m.amortizeYears : m.startupCost);
   const countyPoints =
     fei.impact.status === "ready" && fei.impact.countyBefore != null && fei.impact.countyAfter != null
@@ -450,22 +485,23 @@ export function runScenario(
     countyResidentsBeyondAfter: beyondAfter,
     lowIncomeResidents: lowIncome,
     poundsPerLowIncomeBefore: lowIncome && before2024 != null ? before2024 / lowIncome : null,
-    poundsPerLowIncomeAfter: lowIncome && before2024 != null ? (before2024 + annualPounds) / lowIncome : null,
+    poundsPerLowIncomeAfter: lowIncome && before2024 != null ? (before2024 + (input.additionalPoundsPerMonth ?? 0) * 12) / lowIncome : null,
     fei: fei.impact,
     dollars: {
       annualPounds,
       annualMeals,
       foodValue,
       travelSavings,
+      additionalTravelCost,
       newFoodValue,
-      netNewValue: newFoodValue + travelSavings,
-      netValue: newFoodValue + travelSavings - annualCost,
+      netNewValue: newFoodValue + travelSavings - additionalTravelCost,
+      netValue: newFoodValue + travelSavings - additionalTravelCost - annualCost,
       annualCost,
-      costPerMeal: annualMeals ? annualCost / annualMeals : 0,
-      costPerVisit: annualVisits ? annualCost / annualVisits : 0,
+      costPerMeal: annualMeals ? annualCost / annualMeals : null,
+      costPerVisit: annualVisits ? annualCost / annualVisits : null,
       costPerResidentWithin: newlyWithin > 0 ? annualCost / newlyWithin : null,
-      valuePerDollar: annualCost ? (foodValue + travelSavings) / annualCost : 0,
-      newValuePerDollar: annualCost ? (newFoodValue + travelSavings) / annualCost : 0,
+      valuePerDollar: annualCost ? (foodValue + travelSavings) / annualCost : null,
+      newValuePerDollar: annualCost ? (newFoodValue + travelSavings - additionalTravelCost) / annualCost : null,
       costPerFeiPoint: countyPoints && countyPoints > 0 ? annualCost / countyPoints : null,
     },
   };

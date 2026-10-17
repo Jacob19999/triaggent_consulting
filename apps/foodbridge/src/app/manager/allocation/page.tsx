@@ -19,7 +19,7 @@ const withForecast = research.counties.filter((c) => (c.forecast.PoundsTotal?.yh
 
 type Preset = "audit" | "feiTop" | "nonmetro" | "all" | "custom";
 const PRESETS: { id: Preset; label: string; ids: () => string[]; hint: string }[] = [
-  { id: "audit", label: "Q6 audit-first", ids: () => withForecast.filter((c) => c.robust).map((c) => c.fips), hint: "Counties where need outruns activity on every signal (D-052)." },
+  { id: "audit", label: "Q6 review list", ids: () => withForecast.filter((c) => c.robust).map((c) => c.fips), hint: "Local verification list, not evidence of unmet need or an allocation recommendation (D-052)." },
   { id: "feiTop", label: "Top FEI quintile", ids: () => withForecast.filter((c) => c.fei?.quintile === 5).map((c) => c.fips), hint: "The 20% of counties with the most access barriers." },
   { id: "nonmetro", label: "Nonmetro", ids: () => withForecast.filter((c) => c.nonmetro).map((c) => c.fips), hint: "USDA RUCC 2023 nonmetro counties with a forecast." },
   { id: "all", label: "All counties", ids: () => withForecast.map((c) => c.fips), hint: "Every county with a positive PoundsReg forecast." },
@@ -36,19 +36,21 @@ const POOL_CHIPS = [40000, 100000, 250000, 500000];
 export default function AllocationPage() {
   const { store, refresh, data } = useData();
   const theme = useTheme();
-  const [preset, setPreset] = useState<Preset>("audit");
-  const [ids, setIds] = useState<string[]>(() => PRESETS[0].ids());
+  const [preset, setPreset] = useState<Preset>("all");
+  const [ids, setIds] = useState<string[]>(() => withForecast.map((c) => c.fips));
   const [total, setTotal] = useState(250000);
   const [reserve, setReserve] = useState(10);
   const [needWeight, setNeedWeight] = useState(0);
   const [pick, setPick] = useState("");
   const [saved, setSaved] = useState<string | null>(null);
+  const [saveError, setSaveError] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
   const [sort, setSort] = useState<"draft" | "change" | "fei">("draft");
 
   useEffect(() => {
     const q = new URLSearchParams(window.location.search).get("county");
     if (q && withForecast.some((c) => c.fips === q)) {
-      setIds((cur) => (cur.includes(q) ? cur : [...cur, q]));
+      setIds([q]);
       setPreset("custom");
     }
   }, []);
@@ -145,13 +147,31 @@ export default function AllocationPage() {
 
   const saveDraft = async () => {
     if (!result) return;
-    await store.saveScenario({
-      name: `Allocation · ${fmt.int(total)} lb · ${needWeight}% need · ${ids.length} counties`,
-      kind: "allocation",
-      payload: { input: { total, reserve, needWeight, ids }, rows: result.rows.map((r) => ({ fips: r.fips, pounds: r.pounds })) },
-    });
-    await refresh();
-    setSaved("Saved");
+    setSaving(true);
+    setSaveError(null);
+    try {
+      await store.saveScenario({
+        name: `Allocation · ${fmt.int(total)} lb · ${needWeight}% need · ${ids.length} counties`,
+        kind: "allocation",
+        payload: { input: { total, reserve, needWeight, ids }, rows: result.rows.map((r) => ({ fips: r.fips, pounds: r.pounds })) },
+      });
+      await refresh();
+      setSaved(JSON.stringify({ total, reserve, needWeight, ids }));
+    } catch (e) {
+      setSaveError(`Could not save draft: ${e instanceof Error ? e.message : String(e)}`);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const loadDraft = (payload: unknown) => {
+    try {
+      const input = (payload as { input?: Parameters<typeof allocate>[1] })?.input;
+      if (!input) throw new Error("This draft has no saved settings.");
+      allocate(research.counties, input); // Validate before loading persisted data.
+      setTotal(input.total); setReserve(input.reserve); setNeedWeight(input.needWeight ?? 0);
+      setIds(input.ids); setPreset("custom"); setSaved(null); setSaveError(null);
+    } catch (e) { setSaveError(`Could not open draft: ${e instanceof Error ? e.message : String(e)}`); }
   };
 
   const policy = POLICIES.reduce((best, p) => (Math.abs(p.w - needWeight) < Math.abs(best.w - needWeight) ? p : best), POLICIES[0]);
@@ -165,8 +185,8 @@ export default function AllocationPage() {
         description="Draft how a pool of food is split between counties: by forecast pounds (demand), by need, or a blend. A draft for discussion; it never moves food on its own."
         actions={
           <>
-            <Button variant="secondary" onClick={saveDraft} disabled={!result}>
-              <Icon name="save" /> {saved ?? "Save draft"}
+            <Button variant="secondary" onClick={saveDraft} disabled={!result || saving}>
+              <Icon name="save" /> {saving ? "Saving…" : saved === JSON.stringify({ total, reserve, needWeight, ids }) ? "Saved" : "Save draft"}
             </Button>
             <Button onClick={exportCsv} disabled={!result}>
               <Icon name="download" /> Export CSV
@@ -174,6 +194,8 @@ export default function AllocationPage() {
           </>
         }
       />
+      {saveError && <p role="alert" className="mb-4 text-[13px] text-[var(--critical-text)]">{saveError}</p>}
+      <p className="mb-4 text-[12px] text-ink-2">Historical planning example · August 2026 forecast, observed data through July 2026. Select counties, adjust the pool, then save or export a draft.</p>
 
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-5">
         <Stat icon="box" label="Pool" value={`${fmt.compact(total)} lb`} sub="Pounds available this cycle" />
@@ -305,6 +327,7 @@ export default function AllocationPage() {
               ))}
             </div>
             <p className="mt-2 text-[11.5px] text-muted">Counties without a PoundsReg forecast (Wilkin) cannot join: a missing forecast is never read as zero.</p>
+            {preset === "audit" && <p role="note" className="mt-2 text-[12px] text-[var(--warning-text)]">Q6 is a call list for local checks. Its flag count was at chance (D-052); selecting it does not establish unmet need or justify these allocations.</p>}
           </Card>
         </div>
 
@@ -526,7 +549,7 @@ export default function AllocationPage() {
                   <ul className="divide-y divide-line">
                     {savedDrafts.map((s) => (
                       <li key={s.id} className="flex items-center gap-2 py-2 text-[12.5px]">
-                        <span className="flex-1 text-ink">{s.name}</span>
+                        <button className="flex-1 text-left font-medium text-accent hover:underline" onClick={() => loadDraft(s.payload)} aria-label={`Open ${s.name}`}>{s.name}</button>
                         <span className="text-muted">{fmt.date(s.created_at)}</span>
                         <button
                           className="grid h-7 w-7 place-items-center rounded-md text-muted hover:bg-surface-2 hover:text-[var(--critical-text)]"

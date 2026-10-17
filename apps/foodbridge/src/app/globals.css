@@ -447,6 +447,18 @@ input[type="radio"] {
 .fb-deck {
   --hot: #ffb547;
 }
+/* The slide canvas is the click target on iPad: tap advances, sideways swipe turns the page.
+   touch-action: none stops Safari from scrolling the slide or taking the edge swipe as Back. */
+.fb-deck-stage {
+  touch-action: none;
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+  -webkit-tap-highlight-color: transparent;
+}
+.fb-deck-stage :is(a, button, input, select, textarea, label, summary) {
+  touch-action: manipulation;
+}
 :root:not([data-theme="dark"]) .fb-deck {
   --hot: #c25e00;
 }

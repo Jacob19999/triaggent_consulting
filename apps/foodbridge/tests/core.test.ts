@@ -82,6 +82,7 @@ describe("scenario", () => {
         type: "brick_and_mortar",
         householdsPerMonth: 200,
         poundsPerMonth: 9000,
+        additionalPoundsPerMonth: 9000,
         money: DEFAULT_MONEY.brick_and_mortar,
       },
       tracts,

@@ -155,37 +155,40 @@ Meal Gap tables never go there.
 - **County forecast (August 2026):** the submitted Q7 model (D-045), labelled as an internal
   forecast, never an actual.
 - **Shelf forecast:** the same 1:2:3 working-day run rate on the shelf's own reports, with
-  bands from its one-step backtest errors (six or more), otherwise ±20% / ±35%.
+  bands from its earlier one-step errors (six or more), otherwise assumed ±20% / ±35%.
+  Errors and band application share the same prediction scale, including reported zeros.
+  These are empirical planning ranges, not calibrated coverage guarantees.
 - **Alerts:** deterministic rules in `src/lib/alerts.ts`; each shows its numbers, field and
   next step. Forecast alerts say "may".
 - **Priority score:** weighted sum of equity, stock risk, demand growth, capacity strain and
   reporting gap (weights adjustable; overrides sort first). It never moves food on its own.
 - **New-shelf scenario:** residents at tract centroids; straight-line distance to the nearest
   *reporting* shelf (D-051); USDA 1-mile urban / 10-mile rural thresholds. FEI change follows
-  the FEI build: the new site's 2SFCA ratio is added to tract access, S and T are re-normalized
+  the FEI build: only additional network food enters the new 2SFCA supply ratio; S and T are re-normalized
   with the build's published bounds (a test checks the recomputation matches the published
   pillars). Labelled "approximation from tract averages". Dollar assumptions are editable and
   marked cited, example or placeholder.
-- **New-site forecast (site planner, `src/lib/siteModel.ts`):** for each tract whose nearest
-  reporting shelf would become the new site, shifted visits = residents × the county's August 2026
-  forecast visits per resident (D-045) × a Huff gravity share (distance exponent 2) × the site
-  type's reach (planning assumption: mobile 50%, outreach 40%, campus 35%). Induced visits add
-  e^(k × miles saved) − 1, capped at +50%, where k is fitted in the app from the cross-county
-  association between distance and 2024 visits per low-income resident (about −11% per mile; an
-  association, not causal). Pounds, individuals and ages follow the county's forecast ratios;
-  the planning range uses the county's 80% band and ±50% on the induced part. Manual sizes
-  override the forecast.
-- **Dollar value:** gross value = all food at the site × $/lb; net new value = food for induced
-  visits only + round-trip miles saved per visit × the IRS rate. Both are compared with the
-  annual cost (operating + start-up spread). Estimates for comparing options, not measured impact.
+- **New-site activity scenario (`src/lib/siteModel.ts`, D-070):** shifted visits use tract
+  population × county forecast visits per resident × Huff share (distance exponent 2) × the
+  site type's assumed reach. Additional visits and the share of food added to the network are
+  explicit sensitivity controls, both default zero. County associations do not estimate a
+  site's causal uplift. Pounds, individuals and ages follow county forecast ratios; manual
+  sizes also apply during ranking. Activity ranges are illustrative, not validated site intervals.
+- **Dollar value:** avoided travel applies only to shifted visits; additional visits add travel
+  costs. Additional food value is limited by both assumed new-visit food and additional
+  network supply. Costs remain editable placeholders. Redistribution losses are not modeled.
 - **Optimal sites:** every tract centroid more than half a mile from a reporting shelf (statewide,
   one county, or the top-FEI-quintile counties) is scored with the same engine on one objective:
   statewide FEI reduction, residents leaving the top FEI quintile, residents newly within reach,
   low-income residents reached, or net new value. The best five are kept at a minimum spacing.
-  Statewide search takes about one second in the browser.
+  These are one-site alternatives, not a joint expansion plan. Changing assumptions clears
+  old ranks; missing FEI data produces an error rather than silently changing the objective.
 - **Supply allocation:** unchanged formula (D-048, default 0% need). The page also shows what a
-  visits-only and a need-only split would give each county, the pool composition, a map of draft
-  pounds per resident in poverty, and the draft as a share of the August forecast.
+  forecast-pounds-only and a need-only split would give each county, the pool composition, a map of draft
+  pounds per resident in poverty, and the draft as a share of the August forecast. Both the
+  draft and comparison conserve the available pool using largest remainders. All eligible
+  counties are selected initially; the Q6 review list is explicitly not an allocation mandate.
+  Saved drafts can be reopened; saving and error states are visible.
 - **AI agent:** server-side tool use. Tools only retrieve (policy timeline, county profiles,
   findings, FEI method, the caller's own alerts). The system prompt forbids computing numbers,
   requires a source after each figure, and applies D-052 and D-053 wording.
@@ -203,3 +206,15 @@ Maps draw on Esri basemap tiles (Dark/Light Gray Canvas, Streets, Imagery) from
 production use: before a public or long-lived deployment, add an ArcGIS Location Platform key
 or switch the tile URLs in `src/components/map/LeafletMap.tsx`. Without tiles (offline), maps still
 draw their county and tract colors on a plain background.
+
+## Presenting on an iPad
+
+Open `/present`. Tap **Script** for the timed script, expanded explanation, transition,
+build cues and qualifications. Tap **Q&A** for the expected questions with complete answers
+and source references. Both are persistent touch buttons with 44 px minimum height.
+Use **Previous**, **Next build / Next slide**, or the slide picker to navigate, including
+appendices. **Close** returns to the full slide. N and Q remain optional keyboard shortcuts.
+Notes are visible on the same screen, including when mirrored; this is not a separate
+private presenter display. Expanded explanations are rehearsal/follow-up material, not
+additional timed speech. The current deck has 12 core slides and four appendices; the
+attached D-067 rehearsal PDFs describe an older 13-slide arrangement.
