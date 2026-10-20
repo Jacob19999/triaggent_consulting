@@ -58,6 +58,14 @@ describe("portal gate", () => {
     expect(res.headers.get("set-cookie")).toBeNull();
   });
 
+  it("lets Vercel analytics through without the portal cookie", async () => {
+    for (const p of ["/_vercel/insights/script.js", "/_vercel/insights/view"]) {
+      const res = await middleware(new NextRequest(`${BASE}${p}`));
+      expect(res.status).toBe(200);
+      expect(res.headers.get("x-middleware-next")).toBe("1");
+    }
+  });
+
   it("middleware sends pages to the gate and refuses API, data and chunks", async () => {
     const page = await middleware(new NextRequest(`${BASE}/manager?tab=1`, { headers: html }));
     expect(page.status).toBe(307);

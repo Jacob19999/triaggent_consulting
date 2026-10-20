@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import type { ReactNode } from "react";
+import { Analytics } from "@vercel/analytics/next";
 import { DataProvider } from "@/components/DataProvider";
 import { QrHandoff } from "@/components/QrHandoff";
 import { THEME_SCRIPT } from "@/lib/themeScript";
@@ -37,6 +38,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
         </a>
         <DataProvider>{children}</DataProvider>
         <QrHandoff />
+        <Analytics />
       </body>
     </html>
   );

@@ -8,6 +8,8 @@ import { GATE_COOKIE, GATE_PATH, hasPortalAccess, isOpenPath, portalPassword } f
 //    enforced by row-level security in Postgres and by role checks in the API routes.
 export async function middleware(request: NextRequest) {
   const { pathname, search } = request.nextUrl;
+  // Vercel Web Analytics serves /_vercel/insights on the deployment. It is not portal content.
+  if (pathname.startsWith("/_vercel/")) return NextResponse.next();
   if (!isOpenPath(pathname) && !(await hasPortalAccess(request.cookies.get(GATE_COOKIE)?.value))) {
     return deny(request, pathname + search);
   }
@@ -52,6 +54,6 @@ function deny(request: NextRequest, target: string): Response {
 
 export const config = {
   // Everything, including /_next/static (the app bundle embeds county data), /data and
-  // /deck. Only the gate page, favicon and robots.txt stay open (isOpenPath).
-  matcher: ["/((?!favicon.ico|robots.txt).*)"],
+  // /deck. Only the gate page, favicon, robots.txt and Vercel analytics stay open.
+  matcher: ["/((?!favicon.ico|robots.txt|_vercel/).*)"],
 };
