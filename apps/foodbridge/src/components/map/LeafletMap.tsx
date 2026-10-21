@@ -191,6 +191,13 @@ export function LeafletMap({
   const tiles = useRef<L.TileLayer[]>([]);
   const overlay = useRef<{ outlines?: L.GeoJSON; auditHalo?: L.GeoJSON; dashed?: L.GeoJSON; hatch?: L.GeoJSON; ring?: L.GeoJSON }>({});
   const markerLayer = useRef<L.LayerGroup | null>(null);
+  // The hover outline is its own non-interactive layer. Restyling and raising the hovered path
+  // instead (bringToFront) detaches it from the DOM mid-hover; Chromium then never sends it a
+  // mouseout, so every county the pointer crossed stayed outlined as if selected.
+  const hoverLayer = useRef<L.GeoJSON | null>(null);
+  const hoverId = useRef<string | null>(null);
+  const geom = useRef(geometry);
+  geom.current = geometry;
   const [hover, setHover] = useState<{ id: string; x: number; y: number } | null>(null);
   const [width, setWidth] = useState(800);
 
@@ -211,6 +218,27 @@ export function LeafletMap({
       weight: isSel ? 3 : 0.6,
       opacity: 1,
     };
+  };
+
+  const showHover = (id: string) => {
+    const m = map.current;
+    const g = geom.current[id];
+    if (!m || !g || hoverId.current === id) return;
+    hoverLayer.current?.remove();
+    hoverId.current = id;
+    hoverLayer.current = L.geoJSON(toCollection({ [id]: g }), {
+      interactive: false,
+      style: () => ({ fill: false, weight: 2.2, opacity: 1, color: live.current.theme === "dark" ? "#ffffff" : "#0f1b2a" }),
+    }).addTo(m);
+    (["auditHalo", "dashed", "ring"] as const).forEach((k) => overlay.current[k]?.bringToFront());
+  };
+  /** Clear the hover outline and card; with an id, only if that unit is the one hovered. */
+  const clearHover = (id?: string) => {
+    if (id !== undefined && hoverId.current !== id) return;
+    hoverLayer.current?.remove();
+    hoverLayer.current = null;
+    hoverId.current = null;
+    setHover(null);
   };
 
   const focusRef = useRef(focus ?? null);
@@ -289,6 +317,7 @@ export function LeafletMap({
     el.current.addEventListener("mousedown", stopAuto);
     el.current.addEventListener("wheel", stopAuto, { passive: true });
     el.current.addEventListener("touchstart", stopAuto, { passive: true });
+    el.current.addEventListener("mouseleave", () => clearHover());
     // Count circles are sized in pixels; shrink them at statewide zoom so neighbouring counties'
     // circles do not pile up, and hide the number once it would be unreadable.
     const box = el.current;
@@ -316,6 +345,8 @@ export function LeafletMap({
       units.current = null;
       overlay.current = {};
       markerLayer.current = null;
+      hoverLayer.current = null;
+      hoverId.current = null;
       tiles.current = [];
     };
   }, []);
@@ -338,7 +369,7 @@ export function LeafletMap({
     const m = map.current;
     if (!m) return;
     units.current?.remove();
-    setHover(null);
+    clearHover();
     byId.current.clear();
     const layer = L.geoJSON(toCollection(geometry), {
       style: (f) => baseStyle(String(f?.properties?.id)),
@@ -347,19 +378,17 @@ export function LeafletMap({
         const path = l as L.Path;
         byId.current.set(id, path);
         path.on({
+          // A unit's own mouseout can still be missed (its path is raised when selected), so a
+          // new mouseover replaces whatever outline is showing.
           mouseover: (e: L.LeafletMouseEvent) => {
-            path.setStyle({ weight: 2.2, color: live.current.theme === "dark" ? "#ffffff" : "#0f1b2a" });
-            path.bringToFront();
-            (["auditHalo", "dashed", "ring"] as const).forEach((k) => overlay.current[k]?.bringToFront());
+            showHover(id);
             setHover({ id, x: e.containerPoint.x, y: e.containerPoint.y });
           },
-          mousemove: (e: L.LeafletMouseEvent) => setHover({ id, x: e.containerPoint.x, y: e.containerPoint.y }),
-          mouseout: () => {
-            path.setStyle(baseStyle(id));
-            setHover((h) => (h?.id === id ? null : h));
-            const sel = live.current.selected;
-            if (sel) byId.current.get(sel)?.bringToFront();
+          mousemove: (e: L.LeafletMouseEvent) => {
+            showHover(id);
+            setHover({ id, x: e.containerPoint.x, y: e.containerPoint.y });
           },
+          mouseout: () => clearHover(id),
           click: () => {
             if (!live.current.onMapClick) live.current.onSelect?.(id);
           },
