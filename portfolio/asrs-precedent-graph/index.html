@@ -1,0 +1,1177 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="description" content="Search 3,000 NASA ASRS approach-and-landing safety reports and see which ones resemble each other, linked through shared factors coded by local language models.">
+<meta property="og:title" content="ASRS Precedent Graph">
+<meta property="og:description" content="Search 3,000 NASA ASRS approach-and-landing safety reports and see which ones resemble each other, linked through shared factors coded by local language models.">
+<meta property="og:type" content="website">
+<title>ASRS Precedent Graph</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Semi+Condensed:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500&family=Public+Sans:wght@400;500;600;700&display=swap">
+<style>
+/* Layout: a dark graph workspace. Full-bleed canvas (map of every report, or a focus graph of one
+   report with its shared factors as hub nodes); search palette on top; explore panel floating left;
+   inspector floating right. One deliberate dark look, like a graph view in a notes app. */
+:root {
+  color-scheme: dark;
+  --bg: #0d0f12;
+  --bar: #111418;
+  --panel: rgba(19, 22, 27, 0.94);
+  --raised: #1a1e24;
+  --hover: #232931;
+  --line: #272d34;
+  --line-soft: #1d2228;
+  --ink: #e9ecf0;
+  --ink-2: #b4bcc5;
+  --muted: #838d97;
+  --lit: #ffe9b8;
+  --on-ink: #0d0f12;
+  --t-human: #3987e5; --t-system: #d95926; --t-weather: #199e70; --t-approach: #c98500;
+  --t-event: #d55181; --t-response: #008300; --t-sequence: #9085e9; --t-phase: #e66767;
+  --t-narrative: #b4bcc5; --t-context: #6b7479;
+  --font-display: "Barlow Semi Condensed", "Arial Narrow", system-ui, sans-serif;
+  --font-body: "Public Sans", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  --fs-xs: 0.75rem; --fs-sm: 0.8125rem; --fs-md: 0.875rem; --fs-lg: 1rem; --fs-xl: 1.375rem;
+}
+[hidden] { display: none !important; }
+html, body { height: 100%; }
+body { margin: 0; background: var(--bg); color: var(--ink); font: 400 var(--fs-md)/1.5 var(--font-body); -webkit-font-smoothing: antialiased; overflow: hidden; }
+button, input { font: inherit; color: inherit; }
+:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
+.mono { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+.label { margin: 0; font: 600 var(--fs-xs)/1.2 var(--font-display); text-transform: uppercase; letter-spacing: 0.09em; color: var(--muted); }
+.hint { margin: 0; font-size: var(--fs-sm); color: var(--muted); }
+
+.app { position: fixed; inset: env(safe-area-inset-top, 0px) 0 env(safe-area-inset-bottom, 0px) 0; display: grid; grid-template-rows: auto minmax(0, 1fr); }
+
+/* Top bar */
+.topbar { position: relative; z-index: 40; display: flex; align-items: center; gap: 10px 16px; padding-inline: 16px; padding-block: 10px; background: var(--bar); border-bottom: 1px solid var(--line); }
+.brand { display: flex; align-items: center; gap: 10px; flex: none; }
+.brand svg { flex: none; }
+.brand h1 { margin: 0; font: 700 1.15rem/1.05 var(--font-display); letter-spacing: 0.01em; white-space: nowrap; }
+.brand small { display: block; font: 400 var(--fs-xs)/1.3 var(--font-mono); color: var(--muted); white-space: nowrap; }
+.omni-wrap { position: relative; flex: 1; min-width: 0; max-width: 760px; margin-inline: auto; }
+.omni { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; min-height: 40px; box-sizing: border-box; padding: 4px 8px 4px 10px; background: var(--raised); border: 1px solid var(--line); border-radius: 10px; cursor: text; }
+.omni:focus-within { border-color: #46515c; box-shadow: 0 0 0 3px rgb(255 255 255 / 0.05); }
+.omni > svg { flex: none; color: var(--muted); }
+.omni input { flex: 1; min-width: 150px; border: 0; outline: 0; background: transparent; padding: 6px 2px; }
+.omni input::placeholder { color: var(--muted); }
+.omni input::-webkit-search-cancel-button { display: none; }
+kbd { font: 500 11px/1.4 var(--font-mono); color: var(--muted); border: 1px solid var(--line); border-bottom-width: 2px; border-radius: 4px; padding: 0 5px; }
+.chips { display: contents; }
+.chip { display: inline-flex; align-items: center; gap: 6px; max-width: 100%; padding: 2px 4px 2px 8px; border-radius: 999px; background: var(--hover); border: 1px solid var(--line); font-size: var(--fs-xs); line-height: 1.5; }
+.chip .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--c); flex: none; }
+.chip.text .dot { border-radius: 2px; }
+.chip.region .dot { border-radius: 1px; transform: rotate(45deg) scale(0.85); }
+.chip .txt { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 260px; }
+.chip button { border: 0; background: none; padding: 0 4px; cursor: pointer; color: var(--muted); font-size: 15px; line-height: 1; }
+.chip button:hover { color: var(--ink); }
+
+.palette { position: absolute; left: 0; right: 0; top: calc(100% + 6px); z-index: 60; padding: 6px; background: #14181d; border: 1px solid var(--line); border-radius: 12px; box-shadow: 0 22px 60px rgb(0 0 0 / 0.6); max-height: min(72vh, 600px); overflow: auto; }
+.pal-h { display: flex; justify-content: space-between; gap: 8px; padding: 10px 8px 4px; }
+.pal-item { display: grid; grid-template-columns: 16px minmax(0, 1fr) auto; align-items: start; gap: 0 10px; width: 100%; padding: 7px 8px; border: 0; border-radius: 7px; background: none; text-align: left; cursor: pointer; }
+.pal-item[aria-selected="true"] { background: var(--hover); }
+.pal-item .ic { width: 9px; height: 9px; margin-top: 6px; border-radius: 50%; background: var(--c, var(--ink-2)); justify-self: center; }
+.pal-item .ic.sq { border-radius: 2px; }
+.pal-item .ic.dia { border-radius: 1px; transform: rotate(45deg); }
+.pal-item .ic.ring { background: none; border: 1.5px solid var(--ink-2); width: 8px; height: 8px; }
+.pal-item .ic.q { background: none; width: 12px; height: 12px; margin-top: 4px; color: var(--muted); }
+.pal-item .main { min-width: 0; }
+.pal-item .t { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pal-item .s { color: var(--muted); font-size: var(--fs-xs); line-height: 1.45; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+.pal-item .n { font: 400 var(--fs-xs)/1.9 var(--font-mono); color: var(--muted); white-space: nowrap; }
+.pal-foot { display: flex; flex-wrap: wrap; gap: 6px 16px; padding: 8px 8px 4px; border-top: 1px solid var(--line-soft); margin-top: 6px; font-size: var(--fs-xs); color: var(--muted); }
+mark { background: none; color: var(--lit); font-weight: 600; }
+
+.views { display: inline-flex; flex: none; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
+.views button { border: 0; background: transparent; padding: 7px 12px; cursor: pointer; color: var(--ink-2); font-size: var(--fs-sm); }
+.views button[aria-pressed="true"] { background: var(--ink); color: var(--on-ink); font-weight: 600; }
+.views button:disabled { color: #4d5660; cursor: default; }
+.iconbtn { flex: none; display: inline-flex; align-items: center; gap: 6px; height: 34px; padding: 0 10px; border: 1px solid var(--line); border-radius: 8px; background: transparent; color: var(--ink-2); cursor: pointer; font-size: var(--fs-sm); }
+.iconbtn[aria-pressed="true"] { background: var(--hover); color: var(--ink); }
+
+/* Stage */
+.stage { position: relative; overflow: hidden; --lw: 300px; --rw: 408px; }
+.stage.no-left { --lw: 0px; }
+#cv { position: absolute; inset: 0; width: 100%; height: 100%; display: block; cursor: grab; touch-action: none; }
+#cv.on-node { cursor: pointer; }
+.side { position: absolute; top: 12px; bottom: 12px; z-index: 20; box-sizing: border-box; background: var(--panel); border: 1px solid var(--line); border-radius: 12px; overflow: auto; backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); }
+.side.left { left: 12px; width: 276px; padding: 14px; display: flex; flex-direction: column; gap: 20px; }
+.side.right { right: 12px; width: 384px; padding: 16px 16px 20px; display: flex; flex-direction: column; gap: 16px; }
+.side section { display: flex; flex-direction: column; gap: 8px; }
+.label-row { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+.linkbtn { border: 0; padding: 0; background: none; color: var(--ink-2); cursor: pointer; font-size: var(--fs-xs); text-decoration: underline; text-underline-offset: 2px; text-align: left; }
+.list { display: flex; flex-direction: column; gap: 2px; }
+.list button { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; width: 100%; padding: 6px 8px; border: 0; border-radius: 6px; background: none; text-align: left; cursor: pointer; font-size: var(--fs-sm); line-height: 1.3; color: var(--ink); }
+.list button:hover { background: var(--hover); }
+.list button .n { font: 400 var(--fs-xs)/1.3 var(--font-mono); color: var(--muted); white-space: nowrap; }
+.weights { display: flex; flex-direction: column; gap: 2px; }
+.wrow { display: grid; grid-template-columns: 16px minmax(0, 1fr) 72px; align-items: center; gap: 0 8px; padding: 3px 0; }
+.wrow label { font-size: var(--fs-sm); line-height: 1.25; cursor: pointer; }
+.wrow label small { display: block; font: 400 11px/1.3 var(--font-mono); color: var(--muted); }
+.wrow.off label { color: var(--muted); }
+.wrow input, .setrow input[type="range"] { width: 100%; accent-color: var(--ink-2); margin: 0; }
+.swatch { display: inline-block; width: 14px; height: 0; border-top: 3px solid var(--c); border-radius: 2px; flex: none; }
+.swatch.dash { border-top-style: dashed; }
+.setrow { display: grid; grid-template-columns: minmax(0, 1fr) 30px; align-items: center; gap: 4px 8px; font-size: var(--fs-sm); }
+.setrow input[type="range"] { grid-column: 1 / -1; }
+.setrow output { text-align: right; }
+.check { display: flex; align-items: center; gap: 8px; font-size: var(--fs-sm); cursor: pointer; }
+.check input { accent-color: var(--ink-2); }
+.legend { display: grid; grid-template-columns: 1fr 1fr; gap: 5px 10px; font-size: var(--fs-xs); color: var(--ink-2); }
+.legend span { display: inline-flex; align-items: center; gap: 6px; min-width: 0; }
+.shape { display: inline-block; width: 9px; height: 9px; flex: none; background: var(--c, var(--ink-2)); }
+.shape.round { border-radius: 50%; }
+.shape.sq { border-radius: 2px; }
+details.about summary { cursor: pointer; font-size: var(--fs-sm); color: var(--ink-2); }
+details.about div { display: flex; flex-direction: column; gap: 8px; margin-top: 8px; font-size: var(--fs-sm); color: var(--ink-2); }
+details.about p { margin: 0; }
+
+.trail { position: absolute; z-index: 15; top: 14px; left: calc(var(--lw) + 12px); right: calc(var(--rw) + 12px); display: flex; flex-wrap: wrap; align-items: center; gap: 4px; font: 400 var(--fs-xs)/1.3 var(--font-mono); color: var(--muted); pointer-events: none; }
+.trail > * { pointer-events: auto; }
+.trail button { border: 1px solid var(--line); background: var(--panel); border-radius: 5px; padding: 3px 7px; cursor: pointer; font: inherit; color: var(--ink-2); }
+.trail button[aria-current="true"] { color: var(--ink); border-color: var(--ink-2); }
+.hud { position: absolute; z-index: 15; left: calc(var(--lw) + 14px); right: calc(var(--rw) + 120px); bottom: 12px; display: flex; flex-wrap: wrap; gap: 4px 14px; font: 400 var(--fs-xs)/1.4 var(--font-mono); color: var(--muted); pointer-events: none; }
+.hud b { color: var(--ink-2); font-weight: 500; }
+.zoombox { position: absolute; z-index: 15; right: calc(var(--rw) + 12px); bottom: 12px; display: flex; gap: 4px; }
+.zoombox button { width: 30px; height: 30px; border: 1px solid var(--line); border-radius: 7px; background: var(--panel); color: var(--ink-2); cursor: pointer; line-height: 1; }
+.tip { position: absolute; z-index: 30; pointer-events: none; max-width: 300px; padding: 8px 10px; background: #171b20; border: 1px solid var(--line); border-radius: 8px; box-shadow: 0 10px 30px rgb(0 0 0 / 0.5); font-size: var(--fs-sm); line-height: 1.4; }
+.tip .th { font: 500 var(--fs-xs)/1.4 var(--font-mono); color: var(--ink-2); }
+.tip .tw { margin-top: 4px; color: var(--muted); font-size: var(--fs-xs); }
+
+/* Inspector */
+.back { align-self: flex-start; border: 0; padding: 0; background: none; color: var(--ink-2); cursor: pointer; font-size: var(--fs-xs); }
+.back:hover { color: var(--ink); }
+.ihead { display: flex; flex-direction: column; gap: 4px; }
+.ihead .eyebrow { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; }
+.ihead h2 { margin: 0; font: 600 var(--fs-xl)/1.2 var(--font-body); text-wrap: balance; }
+.ihead h2.mono { font-family: var(--font-mono); font-weight: 500; }
+.ihead .meta { font-size: var(--fs-sm); color: var(--ink-2); }
+.actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.btn { border: 1px solid var(--ink); background: var(--ink); color: var(--on-ink); border-radius: 8px; padding: 6px 12px; cursor: pointer; font-size: var(--fs-sm); font-weight: 600; }
+.btn.ghost { background: transparent; color: var(--ink); border-color: var(--line); font-weight: 500; }
+.btn.ghost:hover { border-color: var(--ink-2); }
+.block { display: flex; flex-direction: column; gap: 6px; }
+.block p { margin: 0; }
+.fchips { display: flex; flex-wrap: wrap; gap: 4px; }
+.fchip { display: inline-flex; align-items: center; gap: 6px; padding: 3px 8px; border: 1px solid var(--line); border-radius: 999px; background: var(--raised); font-size: var(--fs-xs); line-height: 1.35; cursor: pointer; text-align: left; color: var(--ink); }
+.fchip::before { content: ""; width: 7px; height: 7px; border-radius: 2px; background: var(--c); flex: none; }
+.fchip:hover { border-color: var(--c); }
+.fchip.on { border-color: var(--c); box-shadow: inset 0 0 0 1px var(--c); }
+.ai { font: 600 9px/1 var(--font-mono); letter-spacing: 0.04em; padding: 2px 3px; border-radius: 2px; border: 1px solid currentColor; color: var(--ink-2); }
+.group { display: flex; flex-direction: column; gap: 4px; }
+.group-h { display: flex; align-items: center; gap: 8px; font-size: var(--fs-sm); color: var(--ink-2); }
+.group-h .val { margin-left: auto; font: 400 var(--fs-xs)/1 var(--font-mono); color: var(--muted); }
+.quotes { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 6px; }
+.quotes li { font-size: var(--fs-sm); line-height: 1.4; }
+.quotes q { color: var(--ink-2); font-style: italic; }
+ol.events { margin: 0; padding-left: 1.4em; display: flex; flex-direction: column; gap: 2px; font-size: var(--fs-sm); }
+.seq-pair { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.seq-pair > div { min-width: 0; display: flex; flex-direction: column; gap: 4px; }
+.bar { display: flex; gap: 2px; height: 6px; border-radius: 2px; overflow: hidden; background: var(--line-soft); }
+.bar span { display: block; height: 100%; background: var(--c); }
+.strength { display: flex; align-items: center; gap: 10px; font: 400 var(--fs-xs)/1 var(--font-mono); color: var(--ink-2); }
+.strength .bar { flex: 1; height: 8px; }
+.rows { display: flex; flex-direction: column; }
+.row { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 2px 10px; width: 100%; padding: 8px 6px; border: 0; border-top: 1px solid var(--line-soft); background: none; text-align: left; cursor: pointer; color: var(--ink); }
+.row:hover { background: var(--hover); }
+.row .acn { font: 500 var(--fs-xs)/1.5 var(--font-mono); color: var(--ink-2); }
+.row .rt { font-size: var(--fs-sm); line-height: 1.35; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+.row .rm { grid-column: 2; font-size: var(--fs-xs); color: var(--muted); }
+.row .bar { grid-column: 2; margin-top: 4px; }
+.cooc { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; align-items: center; gap: 4px 8px; }
+.cooc .fchip { justify-self: start; }
+.cooc .n { font: 400 var(--fs-xs)/1 var(--font-mono); color: var(--muted); white-space: nowrap; }
+.cooc .plus { border: 1px solid var(--line); background: none; color: var(--ink-2); border-radius: 5px; width: 22px; height: 22px; cursor: pointer; line-height: 1; }
+.cooc .plus:hover { color: var(--ink); border-color: var(--ink-2); }
+details.narr summary { cursor: pointer; font-size: var(--fs-sm); color: var(--ink-2); }
+details.narr .narr-text { margin-top: 8px; font-size: var(--fs-sm); line-height: 1.6; color: var(--ink-2); white-space: pre-wrap; }
+.tips { margin: 0; padding-left: 1.2em; display: flex; flex-direction: column; gap: 8px; font-size: var(--fs-sm); color: var(--ink-2); }
+.tips b { color: var(--ink); }
+.qbtns { display: flex; flex-wrap: wrap; gap: 6px; }
+.qbtns button { border: 1px solid var(--line); background: var(--raised); border-radius: 6px; padding: 3px 9px; cursor: pointer; font: 400 var(--fs-xs)/1.5 var(--font-mono); color: var(--ink-2); }
+.qbtns button:hover { color: var(--ink); border-color: var(--ink-2); }
+.sheet-handle { display: none; }
+
+@media (max-width: 1100px) {
+  .stage { --lw: 0px; --rw: 360px; }
+  .side.left { z-index: 35; box-shadow: 0 20px 60px rgb(0 0 0 / 0.6); }
+  .side.right { width: 348px; }
+}
+@media (max-width: 760px) {
+  .topbar { flex-wrap: wrap; padding-block: 8px; }
+  .brand small { display: none; }
+  .omni-wrap { order: 3; flex-basis: 100%; }
+  .stage { --rw: 0px; }
+  .side.left { left: 8px; right: 8px; width: auto; }
+  .side.right { left: 8px; right: 8px; top: auto; width: auto; height: 44%; bottom: 8px; padding-top: 6px; }
+  .side.right.peek { height: 54px; overflow: hidden; }
+  .sheet-handle { display: block; align-self: center; width: 44px; height: 18px; border: 0; background: none; cursor: pointer; flex: none; }
+  .sheet-handle::before { content: ""; display: block; width: 36px; height: 4px; margin: 0 auto; border-radius: 2px; background: var(--line); }
+  .hud { display: none; }
+  .zoombox { bottom: calc(44% + 18px); right: 12px; }
+  .trail { right: 12px; }
+  .seq-pair { grid-template-columns: 1fr; }
+}
+</style>
+</head>
+<body>
+<div class="app">
+  <header class="topbar">
+    <a class="iconbtn" href="/" style="text-decoration:none" aria-label="Back to the Triaggent homepage">&larr; Triaggent</a>
+    <div class="brand">
+      <svg width="24" height="24" viewBox="0 0 24 24" aria-hidden="true"><g fill="none" stroke="#b4bcc5" stroke-width="1.3"><path d="M5 17 12 6l7 11M5 17h14M12 6v11"/></g><circle cx="12" cy="6" r="2.6" fill="#e9ecf0"/><rect x="2.6" y="14.6" width="4.8" height="4.8" rx="1" fill="#3987e5"/><rect x="16.6" y="14.6" width="4.8" height="4.8" rx="1" fill="#d95926"/><circle cx="12" cy="17" r="1.8" fill="#199e70"/></svg>
+      <div><h1>ASRS Precedent Graph</h1><small id="brand-sub">NASA ASRS · approach &amp; landing</small></div>
+    </div>
+    <div class="omni-wrap">
+      <div class="omni" id="omni">
+        <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><circle cx="7" cy="7" r="4.6" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="m10.5 10.5 3.2 3.2" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
+        <div class="chips" id="chips"></div>
+        <input id="q" type="search" autocomplete="off" spellcheck="false" placeholder="Search reports, factors, aircraft, airports…" aria-label="Search reports and factors" aria-controls="palette" aria-expanded="false" aria-autocomplete="list">
+        <kbd title="Press / or Ctrl+K to search">/</kbd>
+      </div>
+      <div class="palette" id="palette" role="listbox" aria-label="Search results" hidden></div>
+    </div>
+    <div class="views" role="group" aria-label="View">
+      <button type="button" id="v-map" aria-pressed="true">Map</button>
+      <button type="button" id="v-focus" aria-pressed="false" disabled title="Select a report first">Focus</button>
+    </div>
+    <button type="button" class="iconbtn" id="t-left" aria-pressed="true" aria-controls="left">Explore</button>
+  </header>
+
+  <div class="stage" id="stage">
+    <canvas id="cv" aria-label="Graph of safety reports. Use the search box and the inspector lists to navigate with a keyboard."></canvas>
+    <nav class="trail" id="trail" aria-label="Reports you have focused" hidden></nav>
+
+    <aside class="side left" id="left" aria-label="Explore and link settings">
+      <section>
+        <p class="label">Start here</p>
+        <div class="list" id="examples"></div>
+      </section>
+      <section>
+        <p class="label">Regions on the map</p>
+        <div class="list" id="regions"></div>
+      </section>
+      <section>
+        <div class="label-row"><p class="label">What counts as a link</p><button type="button" class="linkbtn" id="reset-w">Reset</button></div>
+        <div class="weights" id="weights"></div>
+      </section>
+      <section>
+        <p class="label">Focus graph</p>
+        <div class="setrow"><label for="n-rel">Related reports</label><output id="n-rel-out" class="mono">16</output><input type="range" id="n-rel" min="6" max="40" value="16"></div>
+        <div class="setrow"><label for="n-hub">Shared factors shown</label><output id="n-hub-out" class="mono">12</output><input type="range" id="n-hub" min="4" max="24" value="12"></div>
+        <label class="check"><input type="checkbox" id="text-links" checked> Dashed links for text similarity</label>
+      </section>
+      <section>
+        <p class="label">Legend</p>
+        <div class="legend" id="legend"></div>
+      </section>
+      <details class="about"><summary>About the data and the links</summary><div id="about"></div></details>
+    </aside>
+
+    <aside class="side right" id="insp" aria-label="Inspector" aria-live="polite"></aside>
+
+    <div class="hud" id="hud"></div>
+    <div class="zoombox">
+      <button type="button" id="z-in" aria-label="Zoom in">+</button>
+      <button type="button" id="z-out" aria-label="Zoom out">&minus;</button>
+      <button type="button" id="z-fit" aria-label="Fit to view">&#9635;</button>
+    </div>
+    <div class="tip" id="tip" hidden></div>
+  </div>
+</div>
+
+<script src="vendor/d3.min.js"></script>
+<script>
+(async function () {
+  "use strict";
+  const $ = (s, el = document) => el.querySelector(s);
+  const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+  const reEsc = s => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  const TAU = Math.PI * 2;
+
+  // Link types in colour-slot order (validated categorical palette, dark steps).
+  const TYPES = [
+    { id: "human", label: "Human factors & CRM", def: 2 },
+    { id: "system", label: "Aircraft system", def: 2 },
+    { id: "weather", label: "Weather & light", def: 2 },
+    { id: "approach", label: "Approach & automation", def: 2 },
+    { id: "event", label: "Event type", def: 2 },
+    { id: "response", label: "Crew response & outcome", def: 1 },
+    { id: "sequence", label: "Similar sequence of events", def: 2, text: true },
+    { id: "phase", label: "Flight phase", def: 1 },
+    { id: "narrative", label: "Similar narrative", def: 2, text: true },
+    { id: "context", label: "Aircraft, operation & place", def: 1 },
+  ];
+  const TI = Object.fromEntries(TYPES.map((t, i) => [t.id, { ...t, slot: i }]));
+  const STEPS = [0, 0.5, 1, 2], STEP_NAMES = ["Off", "Low", "Normal", "High"];
+  const cssv = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+  const COL = Object.fromEntries(TYPES.map(t => [t.id, cssv(`--t-${t.id}`)]));
+  const INK = cssv("--ink"), INK2 = cssv("--ink-2"), MUTED = cssv("--muted"), LIT = cssv("--lit"), BG = cssv("--bg");
+  const WORLD = 480; // map coordinates in [-1, 1] become [-480, 480]
+  const HUB_FONT = "500 11.5px 'Public Sans', system-ui, sans-serif";
+
+  // ------------------------------------------------------------------ data
+  let D;
+  try {
+    const res = await fetch("data/graph.json");
+    if (!res.ok) throw new Error(res.status);
+    D = await res.json();
+  } catch (e) {
+    $("#insp").innerHTML = `<p>Could not load <code>data/graph.json</code>. Open this page from a web server (for example <code>python3 -m http.server</code> in its folder) and reload.</p>`;
+    return;
+  }
+  const R = D.reports, F = D.facets, N = R.length, META = D.meta;
+  const post = F.map(() => []);
+  R.forEach((r, i) => {
+    r.i = i;
+    r.fs = new Set(r.f);
+    r.own = {};
+    for (const f of r.f) {
+      post[f].push(i);
+      const l = F[f].layer;
+      r.own[l] = (r.own[l] || 0) + F[f].idf;
+    }
+    r.narMap = new Map(r.nar || []);
+    r.seqMap = new Map(r.seq || []);
+    r.syn = r.synopsis.toLowerCase();
+    r.hay = ` ${r.acn} ${r.aircraft} ${r.synopsis} ${r.f.map(f => F[f].label).join(" ")} ${(r.events || []).join(" ")}`.toLowerCase();
+    r.wx = r.xy[0] * WORLD;
+    r.wy = r.xy[1] * WORLD;
+  });
+  F.forEach((f, k) => { f.k = k; f.lc = f.label.toLowerCase(); });
+  const byAcn = new Map(R.map((r, i) => [r.acn, i]));
+  const REG = (META.clusters || []).slice().sort((a, b) => b.n - a.n);
+  const regById = new Map(REG.map(c => [c.id, c]));
+  const regMembers = new Map(REG.map(c => [c.id, []]));
+  R.forEach(r => { if (r.cl != null && regMembers.has(r.cl)) regMembers.get(r.cl).push(r.i); });
+  // Sharing one factor that ~2% of reports have is enough to max out a link type.
+  const IDF_REF = Math.log((N + 1) / (N / 50 + 1));
+  const short = l => l.replace(/^(Component|Location|Aircraft): /, "").replace("Communication breakdown:", "Comms breakdown:");
+  const clip = (s, n) => s.length > n ? s.slice(0, n - 1) + "…" : s;
+
+  const state = {
+    view: "map", chips: [], preview: null, sel: null, hover: null, focus: null, trail: [],
+    w: Object.fromEntries(TYPES.map(t => [t.id, STEPS[t.def]])), wver: 0,
+    nRel: 16, nHubs: 12, textLinks: true, listLimit: 30,
+  };
+
+  // ------------------------------------------------------------------ link scoring
+  function score(s, required = []) {
+    const S = R[s], W = state.w;
+    const sumW = TYPES.reduce((a, t) => a + W[t.id], 0) || 1;
+    const req = new Set(required);
+    const sib = new Set(S.sib || []);
+    const C = new Map();
+    const get = j => { let c = C.get(j); if (!c) { c = { j, lay: {}, shared: [], nar: 0, seq: 0 }; C.set(j, c); } return c; };
+    for (const f of S.f) {
+      const l = F[f].layer;
+      if (!W[l] && !req.has(f)) continue;
+      for (const j of post[f]) {
+        if (j === s || sib.has(j)) continue;
+        const c = get(j);
+        c.lay[l] = (c.lay[l] || 0) + F[f].idf;
+        c.shared.push(f);
+      }
+    }
+    for (const [j, v] of S.nar || []) if (j !== s && !sib.has(j)) get(j).nar = v;
+    for (const [j, v] of S.seq || []) if (j !== s && !sib.has(j)) get(j).seq = v;
+    const out = [];
+    for (const c of C.values()) {
+      if (req.size && ![...req].every(f => R[c.j].fs.has(f))) continue;
+      const parts = {};
+      let tot = 0;
+      for (const l in c.lay) {
+        if (!W[l]) continue;
+        const v = W[l] * Math.min(1, c.lay[l] / Math.max(S.own[l] || 0, IDF_REF));
+        parts[l] = v; tot += v;
+      }
+      if (c.nar && W.narrative) { parts.narrative = W.narrative * c.nar; tot += parts.narrative; }
+      if (c.seq && W.sequence) { parts.sequence = W.sequence * c.seq; tot += parts.sequence; }
+      if (tot <= 0) continue;
+      let dom = null, best = -1;
+      for (const l in parts) if (parts[l] > best) { best = parts[l]; dom = l; }
+      out.push({ ...c, parts, total: tot / sumW, dom });
+    }
+    out.sort((a, b) => b.total - a.total || (R[a.j].acn < R[b.j].acn ? -1 : 1));
+    return out;
+  }
+  const relCache = new Map();
+  function related(i, n) {
+    const key = `${i}|${state.wver}`;
+    if (!relCache.has(key)) { if (relCache.size > 60) relCache.clear(); relCache.set(key, score(i).slice(0, 40)); }
+    return relCache.get(key).slice(0, n);
+  }
+  const partSum = c => Object.values(c.parts).reduce((a, b) => a + b, 0) || 1;
+  const segs = c => TYPES.filter(t => c.parts[t.id]).map(t => `<span style="--c:${COL[t.id]};flex:${(c.parts[t.id] / partSum(c)).toFixed(3)}" title="${esc(t.label)}"></span>`).join("");
+  const sharedIn = (c, l) => [...new Set(c.shared)].filter(f => F[f].layer === l).sort((a, b) => F[b].idf - F[a].idf);
+  function reasonText(c) {
+    const top = [...new Set(c.shared)].filter(f => state.w[F[f].layer]).sort((a, b) => F[b].idf - F[a].idf).slice(0, 2).map(f => short(F[f].label));
+    if (top.length) return top.join(" · ");
+    return c.dom === "sequence" ? "similar sequence of events" : "similar narrative";
+  }
+
+  // ------------------------------------------------------------------ search and filters
+  const tokens = q => q.toLowerCase().split(/[\s,]+/).filter(Boolean);
+  const wordRe = t => new RegExp("(^|[^a-z0-9])" + reEsc(t));
+  const textCache = new Map();
+  function textMatch(q) {
+    q = q.trim();
+    if (textCache.has(q)) return textCache.get(q);
+    const out = [];
+    if (/^\d{3,}$/.test(q)) { for (const r of R) if (r.acn.startsWith(q)) out.push(r.i); }
+    else { const res = tokens(q).map(wordRe); if (res.length) for (const r of R) if (res.every(re => re.test(r.hay))) out.push(r.i); }
+    if (textCache.size > 200) textCache.clear();
+    textCache.set(q, out);
+    return out;
+  }
+  const chipMembers = c => c.kind === "factor" ? post[c.id] : c.kind === "region" ? (regMembers.get(c.id) || []) : textMatch(c.text);
+  let matchSet = null;
+  function refreshMatches() {
+    matchSet = null;
+    for (const c of state.chips) {
+      const m = new Set(chipMembers(c));
+      matchSet = matchSet ? new Set([...matchSet].filter(x => m.has(x))) : m;
+    }
+  }
+  function highlightSet() {
+    if (state.preview) return matchSet ? new Set([...state.preview].filter(x => matchSet.has(x))) : state.preview;
+    return matchSet;
+  }
+  const chipColor = c => c.kind === "factor" ? COL[F[c.id].layer] : c.kind === "region" ? INK2 : LIT;
+  const chipLabel = c => c.kind === "factor" ? short(F[c.id].label) : c.kind === "region" ? regById.get(c.id).label : `“${c.text}”`;
+
+  // ------------------------------------------------------------------ canvas and zoom
+  const stage = $("#stage"), cv = $("#cv"), ctx = cv.getContext("2d");
+  let W = 1, H = 1, DPR = 1, raf = 0, T = d3.zoomIdentity, dragging = false;
+  const scenes = { map: { t: null }, focus: { t: null } };
+  const focus = { nodes: [], links: [], byKey: new Map(), adj: new Map(), sim: null, rel: [], hubs: [], req: [] };
+  const requestDraw = () => { if (!raf) raf = requestAnimationFrame(() => { raf = 0; draw(); }); };
+  function resize() {
+    const b = cv.getBoundingClientRect();
+    W = Math.max(1, b.width); H = Math.max(1, b.height);
+    DPR = Math.min(2, window.devicePixelRatio || 1);
+    cv.width = Math.round(W * DPR); cv.height = Math.round(H * DPR);
+    requestDraw();
+  }
+  const zoom = d3.zoom().scaleExtent([0.2, 16]).on("zoom", e => { T = e.transform; scenes[state.view].t = T; hideTip(); requestDraw(); });
+  d3.select(cv)
+    .call(d3.drag().container(cv)
+      .subject(e => { if (state.view !== "focus") return null; const n = hitFocus(e.x, e.y); return n ? { n, x: e.x, y: e.y } : null; })
+      .on("start", e => { dragging = true; hideTip(); if (!e.active) focus.sim.alphaTarget(0.25).restart(); e.subject.n.fx = e.subject.n.x; e.subject.n.fy = e.subject.n.y; })
+      .on("drag", e => { const [wx, wy] = T.invert([e.x, e.y]); e.subject.n.fx = wx; e.subject.n.fy = wy; requestDraw(); })
+      .on("end", e => { dragging = false; if (!e.active) focus.sim.alphaTarget(0); if (!e.subject.n.center) { e.subject.n.fx = null; e.subject.n.fy = null; } }))
+    .call(zoom).on("dblclick.zoom", null);
+
+  // The part of the canvas no panel covers, so fits land in the open area.
+  function openArea() {
+    const b = cv.getBoundingClientRect();
+    let x0 = 16, x1 = W - 16, y0 = 16, y1 = H - 40;
+    const L = $("#left"), I = $("#insp");
+    const narrow = window.innerWidth <= 760;
+    if (!L.hidden && window.innerWidth > 1100) x0 = L.getBoundingClientRect().right - b.left + 16;
+    if (!I.hidden) {
+      const ib = I.getBoundingClientRect();
+      if (narrow) y1 = ib.top - b.top - 12; else x1 = ib.left - b.left - 16;
+    }
+    if (!$("#trail").hidden) y0 = 52;
+    if (x1 - x0 < 120) { x0 = 16; x1 = W - 16; }
+    if (y1 - y0 < 120) { y0 = 16; y1 = H - 16; }
+    return { x0, x1, y0, y1 };
+  }
+  function fitTo(pts, { animate = true, maxK = 5, pad = 0.86 } = {}) {
+    if (!pts.length) return;
+    const a = openArea();
+    let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+    for (const [x, y] of pts) { if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y; }
+    const bw = Math.max(60, x1 - x0), bh = Math.max(60, y1 - y0);
+    const k = Math.min(maxK, pad * (a.x1 - a.x0) / bw, pad * (a.y1 - a.y0) / bh);
+    const t = d3.zoomIdentity.translate((a.x0 + a.x1) / 2 - k * (x0 + x1) / 2, (a.y0 + a.y1) / 2 - k * (y0 + y1) / 2).scale(k);
+    const sel = d3.select(cv);
+    if (animate && !reduceMotion) sel.transition().duration(600).call(zoom.transform, t); else sel.call(zoom.transform, t);
+  }
+  const mapPts = ids => ids.map(i => [R[i].wx, R[i].wy]);
+  function fitScene(animate = true) {
+    if (state.view === "map") fitTo(R.map(r => [r.wx, r.wy]), { animate, pad: 0.94 });
+    else fitTo(focus.nodes.map(n => [n.x, n.y]), { animate, maxK: 2.2, pad: 0.84 });
+  }
+
+  // ------------------------------------------------------------------ hit testing
+  const qt = d3.quadtree().x(r => r.wx).y(r => r.wy).addAll(R);
+  function hitMap(x, y) {
+    const [wx, wy] = T.invert([x, y]);
+    const r = qt.find(wx, wy, 10 / T.k);
+    return r ? { kind: "report", id: r.i } : null;
+  }
+  const zs = () => Math.sqrt(Math.max(0.45, Math.min(3, T.k)));
+  const nodeR = n => n.kind === "factor" ? 6 + 2.4 * Math.sqrt(n.count) : n.center ? 11 : 4 + 4.5 * n.str;
+  function hitFocus(x, y) {
+    let best = null, bd = Infinity;
+    for (const n of focus.nodes) {
+      const [sx, sy] = T.apply([n.x, n.y]);
+      const d = Math.hypot(sx - x, sy - y);
+      if (d < nodeR(n) * zs() + 5 && d < bd) { bd = d; best = n; }
+    }
+    return best;
+  }
+  const keyOf = o => o ? (o.kind === "report" ? "r" + o.id : "f" + o.id) : null;
+  const asObj = n => n.kind === "report" ? { kind: "report", id: n.i } : { kind: "factor", id: n.f };
+  function hit(x, y) {
+    if (state.view === "map") return hitMap(x, y);
+    const n = hitFocus(x, y);
+    return n ? asObj(n) : null;
+  }
+
+  // ------------------------------------------------------------------ drawing
+  function draw() {
+    ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+    ctx.globalAlpha = 1;
+    ctx.fillStyle = BG;
+    ctx.fillRect(0, 0, W, H);
+    if (state.view === "map") drawMap(); else drawFocus();
+  }
+  const scr = (wx, wy) => [T.x + wx * T.k, T.y + wy * T.k];
+  const onScreen = (x, y, m = 30) => x > -m && y > -m && x < W + m && y < H + m;
+
+  function dots(ids, r, fill) {
+    ctx.beginPath();
+    for (const i of ids) {
+      const [x, y] = scr(R[i].wx, R[i].wy);
+      if (!onScreen(x, y)) continue;
+      ctx.moveTo(x + r, y); ctx.arc(x, y, r, 0, TAU);
+    }
+    ctx.fillStyle = fill; ctx.fill();
+  }
+  function glow(x, y, rad) {
+    const g = ctx.createRadialGradient(x, y, 0, x, y, rad);
+    g.addColorStop(0, "rgba(255,255,255,0.20)"); g.addColorStop(1, "rgba(255,255,255,0)");
+    ctx.fillStyle = g; ctx.beginPath(); ctx.arc(x, y, rad, 0, TAU); ctx.fill();
+  }
+  function ring(x, y, rad, color, w) { ctx.beginPath(); ctx.arc(x, y, rad, 0, TAU); ctx.strokeStyle = color; ctx.lineWidth = w; ctx.stroke(); }
+  function label(text, x, y, color, font, align = "center") {
+    ctx.font = font; ctx.textAlign = align; ctx.textBaseline = "middle";
+    ctx.lineWidth = 4; ctx.strokeStyle = BG; ctx.lineJoin = "round"; ctx.strokeText(text, x, y);
+    ctx.fillStyle = color; ctx.fillText(text, x, y);
+  }
+
+  function drawMap() {
+    const r = Math.max(1.5, Math.min(6, 2.0 * Math.sqrt(T.k)));
+    const hl = highlightSet();
+    const fsel = state.sel?.kind === "factor" ? state.sel.id : null;
+    const rsel = state.sel?.kind === "report" ? state.sel.id : null;
+    const quiet = hl || fsel != null || rsel != null;
+    ctx.beginPath();
+    for (const n of R) {
+      if (hl && hl.has(n.i)) continue;
+      const [x, y] = scr(n.wx, n.wy);
+      if (!onScreen(x, y)) continue;
+      ctx.moveTo(x + r, y); ctx.arc(x, y, r, 0, TAU);
+    }
+    ctx.fillStyle = quiet ? "rgba(118,128,140,0.30)" : "rgba(168,179,192,0.72)";
+    ctx.fill();
+    drawRegionLabels(quiet ? 0.32 : 0.9);
+    if (hl && hl.size) {
+      dots(hl, r * 3, "rgba(255,233,184,0.10)");
+      dots(hl, r * 1.15, LIT);
+    }
+    if (fsel != null) dots(post[fsel], r * 1.35, COL[F[fsel].layer]);
+    if (rsel != null) {
+      const s = R[rsel], [sx, sy] = scr(s.wx, s.wy);
+      const rel = related(rsel, 12);
+      ctx.lineWidth = 1.3;
+      for (const c of rel) {
+        const [x, y] = scr(R[c.j].wx, R[c.j].wy);
+        ctx.beginPath(); ctx.moveTo(sx, sy); ctx.lineTo(x, y);
+        ctx.strokeStyle = COL[c.dom]; ctx.globalAlpha = 0.75; ctx.stroke();
+      }
+      ctx.globalAlpha = 1;
+      for (const c of rel) {
+        const [x, y] = scr(R[c.j].wx, R[c.j].wy);
+        ctx.beginPath(); ctx.arc(x, y, r * 1.7, 0, TAU);
+        ctx.fillStyle = COL[c.dom]; ctx.fill();
+        ctx.lineWidth = 1.5; ctx.strokeStyle = BG; ctx.stroke();
+      }
+      glow(sx, sy, r * 6);
+      ring(sx, sy, r * 2.2, INK, 2);
+      ctx.beginPath(); ctx.arc(sx, sy, r * 1.3, 0, TAU); ctx.fillStyle = INK; ctx.fill();
+      label(s.acn, sx, sy + r * 2.2 + 12, INK, "500 11px 'IBM Plex Mono', monospace");
+    }
+    if (state.hover?.kind === "report" && state.hover.id !== rsel) {
+      const h = R[state.hover.id], [x, y] = scr(h.wx, h.wy);
+      ring(x, y, r * 2.4, INK, 1.5);
+    }
+  }
+  function drawRegionLabels(alpha) {
+    const placed = [];
+    const big = "700 11.5px 'Barlow Semi Condensed', 'Arial Narrow', sans-serif", small = "600 10.5px 'Barlow Semi Condensed', 'Arial Narrow', sans-serif";
+    ctx.save();
+    try { ctx.letterSpacing = "0.06em"; } catch (e) {}
+    for (const c of REG) {
+      const [x, y] = scr(c.x * WORLD, c.y * WORLD);
+      const lines = c.label.toUpperCase().split(" · ");
+      ctx.font = big;
+      const w = Math.max(...lines.map(l => ctx.measureText(l).width)) + 10, h = lines.length * 14 + 4;
+      const box = [x - w / 2, y - h / 2, x + w / 2, y + h / 2];
+      if (box[2] < 0 || box[0] > W || box[3] < 0 || box[1] > H) continue;
+      if (placed.some(b => !(box[2] < b[0] || box[0] > b[2] || box[3] < b[1] || box[1] > b[3]))) continue;
+      placed.push(box);
+      ctx.globalAlpha = alpha;
+      lines.forEach((l, k) => label(l, x, y + (k - (lines.length - 1) / 2) * 14, k ? MUTED : INK2, k ? small : big));
+    }
+    ctx.restore();
+    ctx.globalAlpha = 1;
+  }
+
+  function drawFocus() {
+    if (!focus.nodes.length) return;
+    const s = zs();
+    const selN = state.sel ? focus.byKey.get(keyOf(state.sel)) : null;
+    const hovN = state.hover ? focus.byKey.get(keyOf(state.hover)) : null;
+    const act = hovN || (selN && !selN.center ? selN : null);
+    const nb = act ? focus.adj.get(act.key) : null;
+    for (const l of focus.links) {
+      const [ax, ay] = T.apply([l.source.x, l.source.y]), [bx, by] = T.apply([l.target.x, l.target.y]);
+      const on = act && (l.source === act || l.target === act);
+      ctx.beginPath(); ctx.moveTo(ax, ay); ctx.lineTo(bx, by);
+      ctx.setLineDash(l.text ? [3, 4] : []);
+      ctx.globalAlpha = act ? (on ? 0.95 : 0.07) : (l.text ? 0.5 : 0.85);
+      ctx.strokeStyle = on && l.hub ? COL[F[l.hub.f].layer] : on ? INK2 : "rgba(140,152,166,0.38)";
+      ctx.lineWidth = on ? 1.8 : l.center ? 1.3 : 1;
+      ctx.stroke();
+    }
+    ctx.setLineDash([]);
+    for (const n of focus.nodes) {
+      const [x, y] = T.apply([n.x, n.y]);
+      const dim = act && n !== act && !nb.has(n.key);
+      ctx.globalAlpha = dim ? 0.16 : 1;
+      const rad = nodeR(n) * s;
+      if (n.kind === "factor") {
+        ctx.beginPath();
+        if (ctx.roundRect) ctx.roundRect(x - rad, y - rad, 2 * rad, 2 * rad, Math.min(4, rad / 2)); else ctx.rect(x - rad, y - rad, 2 * rad, 2 * rad);
+        ctx.fillStyle = COL[F[n.f].layer]; ctx.fill();
+        ctx.lineWidth = 2; ctx.strokeStyle = BG; ctx.stroke();
+      } else {
+        if (n.center) glow(x, y, rad * 3.2);
+        ctx.beginPath(); ctx.arc(x, y, rad, 0, TAU);
+        ctx.fillStyle = n.center ? "#f4f6f8" : "rgba(200,208,218,0.95)"; ctx.fill();
+        ctx.lineWidth = 2; ctx.strokeStyle = BG; ctx.stroke();
+      }
+      if (n === selN && !n.center) ring(x, y, rad + 4, INK, 1.6);
+      if (n === hovN) ring(x, y, rad + 3, INK2, 1.2);
+    }
+    for (const n of focus.nodes) {
+      const [x, y] = T.apply([n.x, n.y]);
+      const dim = act && n !== act && !nb.has(n.key);
+      ctx.globalAlpha = dim ? 0.18 : 1;
+      const rad = nodeR(n) * s;
+      if (n.kind === "factor") {
+        label(n.text, x, y + rad + 11, n === act || n === selN ? INK : INK2, HUB_FONT);
+      } else if (n.center || n === act || n === selN || T.k > 1.7) {
+        label(R[n.i].acn, x, y + rad + 10, n.center ? INK : INK2, `${n.center ? 600 : 500} ${n.center ? 12 : 10.5}px 'IBM Plex Mono', monospace`);
+      }
+    }
+    ctx.globalAlpha = 1;
+  }
+
+  // ------------------------------------------------------------------ focus graph
+  // Center report, its most related reports, and the factors they share as hub nodes:
+  // report -> factor <- report, so every link shows its reason (text-only links are dashed).
+  function buildFocus(s) {
+    const req = state.chips.filter(c => c.kind === "factor" && R[s].fs.has(c.id)).map(c => c.id);
+    const rel = score(s, req).slice(0, state.nRel);
+    const hi = rel.length ? rel[0].total : 1, lo = rel.length ? rel[rel.length - 1].total : 0;
+    const count = new Map();
+    for (const c of rel) for (const f of new Set(c.shared)) {
+      if (!state.w[F[f].layer] && !req.includes(f)) continue;
+      count.set(f, (count.get(f) || 0) + 1);
+    }
+    const hubs = [...count].map(([f, n]) => ({ f, n, sc: F[f].idf * n * (state.w[F[f].layer] || 1) }))
+      .sort((a, b) => b.sc - a.sc).slice(0, state.nHubs);
+    for (const f of req) if (!hubs.some(h => h.f === f)) hubs.push({ f, n: count.get(f) || 0 });
+    const old = new Map(focus.nodes.map(n => [n.key, n]));
+    const mk = (key, o) => { const p = old.get(key); return Object.assign(o, { key, x: p ? p.x : undefined, y: p ? p.y : undefined }); };
+    const nodes = [], links = [];
+    const center = mk("r" + s, { kind: "report", i: s, center: true, str: 1 });
+    center.fx = 0; center.fy = 0; center.x = 0; center.y = 0;
+    nodes.push(center);
+    const hubNode = new Map();
+    ctx.font = HUB_FONT;
+    hubs.forEach((h, k) => {
+      const n = mk("f" + h.f, { kind: "factor", f: h.f, count: h.n });
+      n.text = `${clip(short(F[h.f].label), 30)} · ${h.n}`;
+      n.lw = ctx.measureText(n.text).width;
+      if (n.x === undefined) { const a = TAU * k / hubs.length; n.x = Math.cos(a) * 120; n.y = Math.sin(a) * 120; }
+      nodes.push(n); hubNode.set(h.f, n);
+      links.push({ source: center, target: n, center: true, hub: n });
+    });
+    rel.forEach((c, k) => {
+      const n = mk("r" + c.j, { kind: "report", i: c.j, c, str: hi > lo ? (c.total - lo) / (hi - lo) : 1 });
+      if (n.x === undefined) { const a = TAU * k / rel.length + 0.3; n.x = Math.cos(a) * 250; n.y = Math.sin(a) * 250; }
+      nodes.push(n);
+      let linked = 0;
+      for (const f of new Set(c.shared)) { const h = hubNode.get(f); if (h) { links.push({ source: n, target: h, hub: h }); linked++; } }
+      if (state.textLinks && (!linked || c.dom === "narrative" || c.dom === "sequence")) links.push({ source: center, target: n, text: true });
+    });
+    focus.nodes = nodes; focus.links = links;
+    focus.byKey = new Map(nodes.map(n => [n.key, n]));
+    focus.adj = new Map(nodes.map(n => [n.key, new Set()]));
+    for (const l of links) { focus.adj.get(l.source.key).add(l.target.key); focus.adj.get(l.target.key).add(l.source.key); }
+    focus.rel = rel; focus.hubs = hubs; focus.req = req;
+    if (focus.sim) focus.sim.stop();
+    focus.sim = d3.forceSimulation(nodes)
+      .force("link", d3.forceLink(links).distance(l => l.text ? 210 : l.center ? 95 : 70).strength(l => l.text ? 0.04 : l.center ? 0.7 : 0.35))
+      .force("charge", d3.forceManyBody().strength(n => n.kind === "factor" ? -340 : -140).distanceMax(600))
+      .force("collide", d3.forceCollide(n => n.kind === "factor" ? Math.max(nodeR(n) + 12, n.lw / 2 + 4) : nodeR(n) + 11).iterations(2))
+      .force("x", d3.forceX(0).strength(0.03)).force("y", d3.forceY(0).strength(0.03))
+      .alphaDecay(0.035).stop();
+    for (let i = 0; i < 220; i++) focus.sim.tick();
+    focus.sim.on("tick", requestDraw);
+    if (!reduceMotion) focus.sim.alpha(0.08).restart();
+  }
+
+  // ------------------------------------------------------------------ tooltip
+  const tip = $("#tip");
+  function showTip(o, x, y) {
+    if (!o) { hideTip(); return; }
+    if (o.kind === "report") {
+      const r = R[o.id];
+      const fn = state.view === "focus" ? focus.byKey.get("r" + o.id) : null;
+      const why = fn && fn.c ? `<div class="tw">strength ${fn.c.total.toFixed(2)} · ${esc(reasonText(fn.c))}</div>` : "";
+      const reg = r.cl != null && regById.get(r.cl) ? ` · ${esc(regById.get(r.cl).label)}` : "";
+      tip.innerHTML = `<div class="th">ACN ${esc(r.acn)} · ${esc(r.date)}</div><div>${esc(clip(r.synopsis, 170))}</div>${why}<div class="tw">${esc(r.aircraft)}${reg}</div>`;
+    } else {
+      const f = F[o.id];
+      const fn = focus.byKey.get("f" + o.id);
+      tip.innerHTML = `<div class="th">${esc(TI[f.layer].label)}${f.src === "llm" ? " · AI-coded" : ""}</div><div>${esc(f.label)}</div><div class="tw">${fn ? `${fn.count} of the related reports share it · ` : ""}on ${f.df} of ${N.toLocaleString()} reports</div>`;
+    }
+    tip.hidden = false;
+    const sb = stage.getBoundingClientRect();
+    let tx = x + 14, ty = y + 14;
+    if (tx + tip.offsetWidth > sb.width - 8) tx = x - tip.offsetWidth - 14;
+    if (ty + tip.offsetHeight > sb.height - 8) ty = y - tip.offsetHeight - 14;
+    tip.style.left = `${Math.max(6, tx)}px`; tip.style.top = `${Math.max(6, ty)}px`;
+  }
+  function hideTip() { tip.hidden = true; }
+
+  // ------------------------------------------------------------------ canvas events
+  const local = e => { const b = cv.getBoundingClientRect(); return [e.clientX - b.left, e.clientY - b.top]; };
+  cv.addEventListener("pointermove", e => {
+    if (dragging || e.buttons) return;
+    const [x, y] = local(e);
+    const h = hit(x, y);
+    if (keyOf(h) !== keyOf(state.hover)) { state.hover = h; requestDraw(); }
+    cv.classList.toggle("on-node", !!h);
+    if (h && e.pointerType !== "touch") showTip(h, x, y); else hideTip();
+  });
+  cv.addEventListener("pointerleave", () => { state.hover = null; hideTip(); requestDraw(); });
+  cv.addEventListener("click", e => {
+    const h = hit(...local(e));
+    if (!h) { if (state.sel && !(state.view === "focus" && state.sel.kind === "report" && state.sel.id === state.focus)) clearSel(); return; }
+    if (h.kind === "report") selectReport(h.id, { pan: false }); else selectFactor(h.id);
+  });
+  cv.addEventListener("dblclick", e => {
+    const h = hit(...local(e));
+    if (h && h.kind === "report") openFocus(h.id);
+  });
+
+  // ------------------------------------------------------------------ actions
+  function setHash(h) { try { history.replaceState(null, "", h ? "#" + h : location.pathname + location.search); } catch (e) {} }
+  function selectReport(i, { pan = true } = {}) {
+    state.sel = { kind: "report", id: i }; state.listLimit = 30;
+    if (state.view === "map") {
+      setHash(`acn${R[i].acn}`);
+      if (pan) fitTo(mapPts([i, ...related(i, 12).map(c => c.j)]), { maxK: 4.5, pad: 0.7 });
+    }
+    renderInspector(); requestDraw(); renderHud();
+  }
+  function selectFactor(f) {
+    state.sel = { kind: "factor", id: f }; state.listLimit = 30;
+    renderInspector(); requestDraw(); renderHud();
+  }
+  function clearSel() {
+    state.sel = state.view === "focus" && state.focus != null ? { kind: "report", id: state.focus } : null;
+    if (state.view === "map") setHash("");
+    renderInspector(); requestDraw(); renderHud();
+  }
+  function openFocus(i, { fromTrail = false } = {}) {
+    if (fromTrail) state.trail = state.trail.slice(0, state.trail.indexOf(i) + 1);
+    else { state.trail = state.trail.filter(x => x !== i); state.trail.push(i); state.trail = state.trail.slice(-8); }
+    const already = state.view === "focus";
+    state.focus = i; state.sel = { kind: "report", id: i }; state.view = "focus"; state.listLimit = 30;
+    renderTrail();
+    buildFocus(i);
+    fitScene(already);
+    setHash(`focus${R[i].acn}`);
+    renderInspector(); renderHud(); requestDraw();
+  }
+  function setView(v) {
+    if (v === state.view) return;
+    if (v === "focus") {
+      const target = state.sel?.kind === "report" ? state.sel.id : state.focus;
+      if (target == null) return;
+      if (target !== state.focus || !focus.nodes.length) { openFocus(target); return; }
+    }
+    state.view = v;
+    if (v === "map") focus.sim?.stop();
+    else state.sel = { kind: "report", id: state.focus };
+    renderTrail();
+    const t = scenes[v].t;
+    if (t) d3.select(cv).call(zoom.transform, t); else fitScene(false);
+    setHash(v === "focus" ? `focus${R[state.focus].acn}` : state.sel?.kind === "report" ? `acn${R[state.sel.id].acn}` : "");
+    hideTip(); renderInspector(); renderHud(); requestDraw();
+  }
+  function addChip(c) {
+    const same = x => x.kind === c.kind && (c.kind === "text" ? x.text === c.text : x.id === c.id);
+    if (!state.chips.some(same)) state.chips.push(c);
+    $("#q").value = ""; state.preview = null; closePalette();
+    refreshMatches(); renderChips();
+    if (state.view === "focus") { buildFocus(state.focus); state.sel = { kind: "report", id: state.focus }; }
+    else { state.sel = null; if (matchSet && matchSet.size) fitTo(mapPts([...matchSet]), { maxK: 3.5 }); }
+    state.listLimit = 30;
+    renderInspector(); renderHud(); requestDraw();
+  }
+  function removeChip(k) {
+    state.chips.splice(k, 1);
+    refreshMatches(); renderChips();
+    if (state.view === "focus") buildFocus(state.focus);
+    renderInspector(); renderHud(); requestDraw();
+  }
+
+  // ------------------------------------------------------------------ search palette
+  const q = $("#q"), pal = $("#palette");
+  let palItems = [], palIdx = 0, timer = 0;
+  const POPULAR = ["Flying RNP / RNAV (GPS) approach", "Communication breakdown: flight crew ↔ flight crew", "Unstabilized approach",
+    "Windshear", "ATA 32 Landing gear & brakes", "Go-around / missed approach", "Wake vortex encounter", "CFIT / CFTT"];
+  const QUERIES = ["rnav", "hydraulic", "windshear", "go around", "737", "DEN", "fatigue", "tcas"];
+  const SEARCH_ICON = `<svg width="12" height="12" viewBox="0 0 16 16" aria-hidden="true"><circle cx="7" cy="7" r="4.6" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="m10.5 10.5 3.2 3.2" stroke="currentColor" stroke-width="1.6"/></svg>`;
+  function hiText(text, toks) {
+    let out = esc(text);
+    for (const t of toks) out = out.replace(new RegExp(`(^|[^a-z0-9])(${reEsc(esc(t))})`, "gi"), "$1<mark>$2</mark>");
+    return out;
+  }
+  function snippet(syn, toks) {
+    const lc = syn.toLowerCase();
+    let at = -1;
+    for (const t of toks) { const m = lc.search(wordRe(t)); if (m >= 0 && (at < 0 || m < at)) at = m; }
+    if (at < 60) return clip(syn, 150);
+    return "…" + clip(syn.slice(at - 40), 140);
+  }
+  const factorItem = (f, toks = []) => ({ act: () => addChip({ kind: "factor", id: f }),
+    html: `<span class="ic sq" style="--c:${COL[F[f].layer]}"></span><span class="main"><span class="t">${hiText(F[f].label, toks)}${F[f].src === "llm" ? ' <span class="ai">AI</span>' : ""}</span><span class="s">${esc(TI[F[f].layer].label)} · add as a filter</span></span><span class="n">${F[f].df}</span>` });
+  const reportItem = (i, toks = []) => ({ act: () => { closePalette(); q.blur(); selectReport(i); },
+    html: `<span class="ic ring"></span><span class="main"><span class="t mono">${esc(R[i].acn)} · ${esc(R[i].date)} · ${esc(R[i].aircraft)}</span><span class="s">${hiText(snippet(R[i].synopsis, toks), toks)}</span></span><span class="n"></span>` });
+  const regionItem = (c, toks = []) => ({ act: () => { if (state.view !== "map") setView("map"); addChip({ kind: "region", id: c.id }); },
+    html: `<span class="ic dia" style="--c:${INK2}"></span><span class="main"><span class="t">${hiText(c.label, toks)}</span><span class="s">Region on the map</span></span><span class="n">${c.n}</span>` });
+  function runSearch() {
+    const text = q.value.trim();
+    const sections = [];
+    if (!text) {
+      state.preview = null;
+      sections.push({ h: "Start from an example", items: (META.examples || []).filter(x => byAcn.has(x.acn)).map(x => {
+        const i = byAcn.get(x.acn);
+        return { act: () => { closePalette(); q.blur(); openFocus(i); }, html: `<span class="ic ring"></span><span class="main"><span class="t">${esc(x.label)}</span><span class="s mono">ACN ${esc(x.acn)} · ${esc(R[i].date)} · ${esc(R[i].aircraft)}</span></span><span class="n">focus</span>` };
+      }) });
+      sections.push({ h: "Common factors", items: POPULAR.map(l => F.findIndex(f => f.label === l)).filter(f => f >= 0).map(f => factorItem(f)) });
+      sections.push({ h: "Or type", items: QUERIES.map(w => ({ act: () => { q.value = w; runSearch(); }, html: `<span class="ic q">${SEARCH_ICON}</span><span class="main"><span class="t mono">${esc(w)}</span></span><span class="n"></span>` })) });
+    } else {
+      const toks = tokens(text), res = toks.map(wordRe);
+      const fac = [];
+      for (const f of F) {
+        if (!f.df || !res.every(re => re.test(f.lc))) continue;
+        let s = 0.25 * Math.log1p(f.df);
+        for (const t of toks) s += f.lc.startsWith(t) ? 3 : 1;
+        fac.push([f.k, s]);
+      }
+      fac.sort((a, b) => b[1] - a[1]);
+      const reg = REG.filter(c => res.every(re => re.test(c.label.toLowerCase())));
+      const ids = textMatch(text);
+      const rep = ids.map(i => { let s = R[i].events ? 0.2 : 0; for (const re of res) s += re.test(R[i].syn) ? 2 : 1; return [i, s]; })
+        .sort((a, b) => b[1] - a[1] || R[b[0]].f.length - R[a[0]].f.length);
+      state.preview = ids.length ? new Set(ids) : null;
+      if (fac.length) sections.push({ h: "Factors", n: `${fac.length}`, items: fac.slice(0, 6).map(([f]) => factorItem(f, toks)) });
+      if (reg.length) sections.push({ h: "Regions", items: reg.slice(0, 3).map(c => regionItem(c, toks)) });
+      if (rep.length) sections.push({ h: "Reports", n: `${ids.length} match${ids.length === 1 ? "" : "es"} · lit on the map`, items: rep.slice(0, 6).map(([i]) => reportItem(i, toks)) });
+      if (ids.length > 1) sections.push({ h: "", items: [{ act: () => addChip({ kind: "text", text }), html: `<span class="ic sq" style="--c:${LIT}"></span><span class="main"><span class="t">Filter to all ${ids.length} reports matching “${esc(text)}”</span></span><span class="n"></span>` }] });
+      if (!sections.length) sections.push({ h: "No matches", items: [], empty: `Nothing matches “${esc(text)}”. Try fewer words, an aircraft type (737), an airport code (DEN) or a report number.` });
+    }
+    palItems = sections.flatMap(s => s.items);
+    palIdx = 0;
+    let k = 0;
+    pal.innerHTML = sections.map(s => `${s.h ? `<div class="pal-h"><span class="label">${esc(s.h)}</span>${s.n ? `<span class="label">${esc(s.n)}</span>` : ""}</div>` : ""}${s.empty ? `<p class="hint" style="padding:4px 8px 10px">${s.empty}</p>` : ""}${s.items.map(it => `<button type="button" class="pal-item" role="option" data-k="${k++}" aria-selected="false">${it.html}</button>`).join("")}`).join("")
+      + `<div class="pal-foot"><span><kbd>↑</kbd> <kbd>↓</kbd> move</span><span><kbd>↵</kbd> open</span><span><kbd>esc</kbd> close</span><span><kbd>⌫</kbd> remove last filter</span></div>`;
+    pal.querySelectorAll(".pal-item").forEach(b => {
+      b.addEventListener("mousedown", e => { e.preventDefault(); const it = palItems[+b.dataset.k]; if (it) it.act(); });
+      b.addEventListener("mousemove", () => { if (palIdx !== +b.dataset.k) { palIdx = +b.dataset.k; markPal(); } });
+    });
+    markPal();
+    pal.hidden = false; q.setAttribute("aria-expanded", "true");
+    requestDraw(); renderHud();
+  }
+  function markPal() {
+    pal.querySelectorAll(".pal-item").forEach(b => b.setAttribute("aria-selected", String(+b.dataset.k === palIdx)));
+    pal.querySelector(`.pal-item[data-k="${palIdx}"]`)?.scrollIntoView({ block: "nearest" });
+  }
+  function closePalette() { pal.hidden = true; q.setAttribute("aria-expanded", "false"); }
+  q.addEventListener("input", () => { clearTimeout(timer); timer = setTimeout(runSearch, 80); });
+  q.addEventListener("focus", runSearch);
+  q.addEventListener("blur", () => setTimeout(() => { if (document.activeElement !== q) { closePalette(); if (state.preview) { state.preview = null; requestDraw(); renderHud(); } } }, 120));
+  q.addEventListener("keydown", e => {
+    if (e.key === "ArrowDown" && palItems.length) { e.preventDefault(); palIdx = (palIdx + 1) % palItems.length; markPal(); }
+    else if (e.key === "ArrowUp" && palItems.length) { e.preventDefault(); palIdx = (palIdx - 1 + palItems.length) % palItems.length; markPal(); }
+    else if (e.key === "Enter") { e.preventDefault(); const it = palItems[palIdx]; if (it) it.act(); }
+    else if (e.key === "Escape") { closePalette(); q.blur(); }
+    else if (e.key === "Backspace" && !q.value && state.chips.length) removeChip(state.chips.length - 1);
+  });
+  $("#omni").addEventListener("click", e => { if (!e.target.closest("button")) q.focus(); });
+  document.addEventListener("keydown", e => {
+    const typing = /INPUT|TEXTAREA|SELECT/.test(document.activeElement?.tagName || "");
+    if ((e.key === "/" && !typing) || ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k")) { e.preventDefault(); q.focus(); q.select(); }
+    else if (e.key === "Escape" && !typing && state.sel) clearSel();
+  });
+  function renderChips() {
+    $("#chips").innerHTML = state.chips.map((c, k) => `<span class="chip ${c.kind}" style="--c:${chipColor(c)}"><span class="dot"></span><span class="txt">${esc(chipLabel(c))}</span><button type="button" data-act="rm-chip" data-k="${k}" aria-label="Remove filter ${esc(chipLabel(c))}">×</button></span>`).join("");
+    q.placeholder = state.chips.length ? "Add another filter…" : "Search reports, factors, aircraft, airports…";
+  }
+
+  // ------------------------------------------------------------------ inspector
+  let narratives = null;
+  async function loadNarrative(acn, el) {
+    try {
+      if (!narratives) narratives = await fetch("data/narratives.json").then(r => r.json());
+      el.textContent = narratives[acn] || "No narrative on file.";
+    } catch (e) { el.textContent = "Could not load the narratives file."; }
+  }
+  const fchip = (f, on = false) => `<button type="button" class="fchip${on ? " on" : ""}" style="--c:${COL[F[f].layer]}" data-act="factor" data-f="${f}" title="${esc(TI[F[f].layer].label)} · on ${F[f].df} reports">${esc(short(F[f].label))}${F[f].src === "llm" ? ' <span class="ai">AI</span>' : ""}</button>`;
+  const rowHTML = i => `<button type="button" class="row" data-act="report" data-i="${i}"><span class="acn">${esc(R[i].acn)}</span><span class="rt">${esc(R[i].synopsis)}</span><span class="rm">${esc(R[i].date)} · ${esc(R[i].aircraft)}</span></button>`;
+  const simRow = c => `<button type="button" class="row" data-act="report" data-i="${c.j}"><span class="acn">${esc(R[c.j].acn)}</span><span class="rt">${esc(reasonText(c))}</span><span class="rm">${esc(R[c.j].date)} · ${esc(R[c.j].aircraft)} · strength ${c.total.toFixed(2)}</span><span class="bar">${segs(c)}</span></button>`;
+  function listMore(ids) {
+    const shown = ids.slice(0, state.listLimit).map(rowHTML).join("");
+    const rest = ids.length - state.listLimit;
+    return `<div class="rows">${shown}</div>${rest > 0 ? `<button type="button" class="btn ghost" data-act="more">Show ${Math.min(30, rest)} more of ${rest}</button>` : ""}`;
+  }
+  function cooccur(ids, exclude) {
+    const cnt = new Map();
+    for (const i of ids) for (const f of R[i].f) if (!exclude.has(f)) cnt.set(f, (cnt.get(f) || 0) + 1);
+    return [...cnt].filter(([, n]) => n >= 2 && n < ids.length).map(([f, n]) => ({ f, n, lift: (n / ids.length) / (F[f].df / N) }))
+      .filter(x => x.lift > 1.3).sort((a, b) => b.n * Math.log(b.lift) - a.n * Math.log(a.lift)).slice(0, 8);
+  }
+  const coocHTML = (list, base) => list.length
+    ? `<div class="cooc">${list.map(x => `${fchip(x.f)}<span class="n">${x.n} · ${x.lift.toFixed(1)}×</span><button type="button" class="plus" data-act="add-factor" data-f="${x.f}" title="Add as a filter" aria-label="Add ${esc(F[x.f].label)} as a filter">+</button>`).join("")}</div><p class="hint">Count among ${base}, and how many times more common than across all reports. Use + to add one as a filter.</p>`
+    : `<p class="hint">No factor stands out among ${base}.</p>`;
+  const byDate = ids => ids.slice().sort((a, b) => (R[b].date > R[a].date ? 1 : R[b].date < R[a].date ? -1 : 0));
+
+  function llmBlock(r) {
+    const quoted = r.f.filter(f => F[f].src === "llm" && r.q && r.q[f]);
+    if (!r.events && !quoted.length) return `<div class="block"><p class="label">Local LLM</p><p class="hint">Not coded yet: the local model has read ${META.n_llm_coded.toLocaleString()} of ${N.toLocaleString()} reports so far.</p></div>`;
+    const qs = quoted.length ? `<ul class="quotes">${quoted.map(f => `<li>${fchip(f)} <q>${esc(r.q[f])}</q></li>`).join("")}</ul>` : `<p class="hint">No approach type, CRM or automation factor that the report's own words support.</p>`;
+    const ev = r.events?.length ? `<div class="block"><p class="label">Sequence of events · LLM summary</p><ol class="events">${r.events.map(e => `<li>${esc(e)}</li>`).join("")}</ol></div>` : "";
+    return `<div class="block"><p class="label">Coded by the local LLM, each with its quote</p>${qs}</div>${ev}`;
+  }
+  function factorGroups(r, shared) {
+    return TYPES.filter(t => !t.text).map(t => {
+      const fs = r.f.filter(f => F[f].layer === t.id).sort((a, b) => F[b].idf - F[a].idf);
+      if (!fs.length) return "";
+      return `<div class="group"><div class="group-h"><span class="swatch" style="--c:${COL[t.id]}"></span>${esc(t.label)}</div><div class="fchips">${fs.map(f => fchip(f, shared && shared.has(f))).join("")}</div></div>`;
+    }).join("");
+  }
+  function whyBlock(c, centre) {
+    const sum = partSum(c);
+    const groups = TYPES.filter(t => c.parts[t.id]).sort((a, b) => c.parts[b.id] - c.parts[a.id]).map(t => {
+      const pct = `${Math.round(100 * c.parts[t.id] / sum)}%`;
+      const body = t.id === "narrative" ? `<p class="hint">The two narratives use similar language (score ${c.nar.toFixed(2)}).</p>`
+        : t.id === "sequence" ? `<p class="hint">The LLM summaries of the two events follow a similar course (score ${c.seq.toFixed(2)}).</p>`
+        : `<div class="fchips">${sharedIn(c, t.id).map(f => fchip(f, true)).join("")}</div>`;
+      return `<div class="group"><div class="group-h"><span class="swatch${t.text ? " dash" : ""}" style="--c:${COL[t.id]}"></span>${esc(t.label)}<span class="val">${pct}</span></div>${body}</div>`;
+    }).join("");
+    const s = R[centre], r = R[c.j];
+    const seq = (s.events || r.events) ? `<div class="block"><p class="label">Sequence of events · LLM summaries</p><div class="seq-pair">
+      <div><span class="label">Center ${esc(s.acn)}</span>${s.events ? `<ol class="events">${s.events.map(e => `<li>${esc(e)}</li>`).join("")}</ol>` : `<p class="hint">Not coded yet.</p>`}</div>
+      <div><span class="label">This ${esc(r.acn)}</span>${r.events ? `<ol class="events">${r.events.map(e => `<li>${esc(e)}</li>`).join("")}</ol>` : `<p class="hint">Not coded yet.</p>`}</div></div></div>` : "";
+    return `<div class="block"><p class="label">Why it links to ACN ${esc(s.acn)}</p><div class="strength"><span>strength ${c.total.toFixed(2)}</span><div class="bar" role="img" aria-label="Share of the link by type">${segs(c)}</div></div>${groups}</div>${seq}`;
+  }
+
+  function viewReport(i) {
+    const r = R[i];
+    const inFocus = state.view === "focus" && state.focus != null;
+    const isCenter = inFocus && i === state.focus;
+    const fn = inFocus && !isCenter ? focus.byKey.get("r" + i) : null;
+    const reg = r.cl != null ? regById.get(r.cl) : null;
+    const back = inFocus && !isCenter ? `<button type="button" class="back" data-act="report" data-i="${state.focus}">← Center report ${esc(R[state.focus].acn)}</button>`
+      : !inFocus && matchSet ? `<button type="button" class="back" data-act="back-set">← ${matchSet.size} matching reports</button>` : "";
+    const sibs = (r.sib || []).map(j => `<button type="button" class="linkbtn" data-act="report" data-i="${j}">ACN ${esc(R[j].acn)}</button>`).join(", ");
+    return `${back}
+      <div class="ihead"><div class="eyebrow"><span class="label">${isCenter ? "Center report" : "Report"}</span>${reg ? `<button type="button" class="linkbtn" data-act="region" data-id="${reg.id}">${esc(reg.label)}</button>` : ""}</div>
+        <h2 class="mono">ACN ${esc(r.acn)}</h2><div class="meta">${esc(r.date)} · ${esc(r.aircraft)}</div></div>
+      <div class="actions">${isCenter ? `<button type="button" class="btn ghost" data-act="view-map">Show it on the map</button>` : `<button type="button" class="btn" data-act="focus" data-i="${i}">Focus graph on this report</button>`}</div>
+      ${sibs ? `<p class="hint">Other reports of this same event: ${sibs}</p>` : ""}
+      ${fn && fn.c ? whyBlock(fn.c, state.focus) : ""}
+      <div class="block"><p class="label">ASRS analyst synopsis</p><p>${esc(r.synopsis)}</p></div>
+      ${llmBlock(r)}
+      <div class="block"><p class="label">Factors · click one to explore it</p>${factorGroups(r, fn && fn.c ? new Set(fn.c.shared) : null)}</div>
+      ${fn ? "" : `<div class="block"><p class="label">Most similar reports</p><div class="rows">${related(i, 8).map(simRow).join("")}</div></div>`}
+      <details class="narr" data-acn="${esc(r.acn)}"><summary>Read the reporter's narrative</summary><div class="narr-text">Loading…</div></details>`;
+  }
+  function viewFactor(f) {
+    const x = F[f], ids = post[f];
+    const fn = state.view === "focus" ? focus.byKey.get("f" + f) : null;
+    const inRel = fn ? focus.rel.filter(c => R[c.j].fs.has(f)).map(c => c.j) : [];
+    const onChip = state.chips.some(c => c.kind === "factor" && c.id === f);
+    const back = state.view === "focus" ? `<button type="button" class="back" data-act="report" data-i="${state.focus}">← Center report ${esc(R[state.focus].acn)}</button>` : matchSet ? `<button type="button" class="back" data-act="back-set">← ${matchSet.size} matching reports</button>` : "";
+    return `${back}
+      <div class="ihead"><div class="eyebrow"><span class="swatch" style="--c:${COL[x.layer]}"></span><span class="label">${esc(TI[x.layer].label)}${x.src === "llm" ? " · coded by the local LLM" : " · ASRS analyst code"}</span></div>
+        <h2>${esc(x.label)}</h2><div class="meta">On <b>${x.df}</b> of ${N.toLocaleString()} reports (${(100 * x.df / N).toFixed(1)}%)</div></div>
+      <div class="actions">${onChip ? `<span class="hint">This is one of your filters.</span>` : `<button type="button" class="btn" data-act="${state.view === "focus" ? "map-factor" : "add-factor"}" data-f="${f}">${state.view === "focus" ? `See all ${x.df} on the map` : `Filter to these ${x.df} reports`}</button>`}</div>
+      ${fn ? `<div class="block"><p class="label">Related reports here that share it · ${inRel.length}</p><div class="rows">${inRel.map(rowHTML).join("")}</div></div>` : ""}
+      <div class="block"><p class="label">Often appears with</p>${coocHTML(cooccur(ids, new Set([f])), "these reports")}</div>
+      <div class="block"><p class="label">Reports · newest first</p>${listMore(byDate(ids))}</div>`;
+  }
+  function viewSet() {
+    const ids = [...matchSet];
+    const ex = new Set(state.chips.filter(c => c.kind === "factor").map(c => c.id));
+    return `<div class="ihead"><span class="label">Filtered reports</span><h2>${ids.length} report${ids.length === 1 ? "" : "s"} match</h2>
+        <div class="fchips">${state.chips.map(c => `<span class="chip ${c.kind}" style="--c:${chipColor(c)}"><span class="dot"></span><span class="txt">${esc(chipLabel(c))}</span></span>`).join("")}</div></div>
+      <div class="actions">${ids.length ? `<button type="button" class="btn ghost" data-act="fit-set">Zoom the map to them</button>` : ""}<button type="button" class="btn ghost" data-act="clear-chips">Clear filters</button></div>
+      ${ids.length ? `<div class="block"><p class="label">Narrow it down</p>${coocHTML(cooccur(ids, ex), "the matches")}</div>
+      <div class="block"><p class="label">Reports · newest first</p>${listMore(byDate(ids))}</div>` : `<p class="hint">No report has all of these. Remove a filter from the search bar.</p>`}`;
+  }
+  function viewWelcome() {
+    return `<div class="ihead"><span class="label">${N.toLocaleString()} safety reports</span><h2>Find reports that resemble each other, and see why</h2></div>
+      <ol class="tips">
+        <li><b>Search</b> for a factor, an aircraft, an airport or any word. Matching reports light up on the map as you type. Press <kbd>/</kbd> to start.</li>
+        <li><b>Combine</b> factors as filters: pick “Flying RNP / RNAV (GPS) approach”, then add a CRM or weather factor.</li>
+        <li><b>Open a report</b> and choose Focus to see the reports most like it, joined through the factors they share.</li>
+      </ol>
+      <div class="block"><p class="label">Try a search</p><div class="qbtns">${QUERIES.map(w => `<button type="button" data-act="query" data-q="${esc(w)}">${esc(w)}</button>`).join("")}</div></div>
+      <div class="block"><p class="label">Reading the map</p><p class="hint">Each dot is one report. Reports that tell similar stories sit close together, and each label names what most reports in that region have in common. Distance on the map is a rough guide; the focus graph shows the exact links.</p></div>`;
+  }
+  function renderInspector() {
+    const el = $("#insp");
+    let html;
+    if (state.sel?.kind === "report") html = viewReport(state.sel.id);
+    else if (state.sel?.kind === "factor") html = viewFactor(state.sel.id);
+    else if (matchSet) html = viewSet();
+    else html = viewWelcome();
+    el.innerHTML = `<button type="button" class="sheet-handle" data-act="sheet" aria-label="Expand or collapse the details"></button>` + html;
+    el.querySelectorAll("details.narr[data-acn]").forEach(d => d.addEventListener("toggle", () => { if (d.open) loadNarrative(d.dataset.acn, d.querySelector(".narr-text")); }));
+    el.scrollTop = 0;
+  }
+
+  document.addEventListener("click", e => {
+    const el = e.target.closest("[data-act]");
+    if (!el) return;
+    const a = el.dataset.act, n = k => +el.dataset[k];
+    if (a === "report") selectReport(n("i"));
+    else if (a === "focus") openFocus(n("i"));
+    else if (a === "factor") selectFactor(n("f"));
+    else if (a === "add-factor") addChip({ kind: "factor", id: n("f") });
+    else if (a === "map-factor") { const f = n("f"); setView("map"); addChip({ kind: "factor", id: f }); }
+    else if (a === "region") { if (state.view !== "map") setView("map"); addChip({ kind: "region", id: n("id") }); }
+    else if (a === "rm-chip") removeChip(n("k"));
+    else if (a === "clear-chips") { state.chips = []; refreshMatches(); renderChips(); if (state.view === "focus") buildFocus(state.focus); renderInspector(); renderHud(); requestDraw(); }
+    else if (a === "back-set") { state.sel = null; renderInspector(); requestDraw(); renderHud(); }
+    else if (a === "fit-set") { if (state.view !== "map") setView("map"); fitTo(mapPts([...matchSet]), { maxK: 4 }); }
+    else if (a === "query") { q.value = el.dataset.q; q.focus(); runSearch(); }
+    else if (a === "trail") openFocus(n("i"), { fromTrail: true });
+    else if (a === "view-map") { const i = state.focus; setView("map"); selectReport(i); }
+    else if (a === "more") { state.listLimit += 30; const st = $("#insp").scrollTop; renderInspector(); $("#insp").scrollTop = st; }
+    else if (a === "sheet") $("#insp").classList.toggle("peek");
+  });
+
+  // ------------------------------------------------------------------ panels and chrome
+  function updateViews() {
+    $("#v-map").setAttribute("aria-pressed", String(state.view === "map"));
+    $("#v-focus").setAttribute("aria-pressed", String(state.view === "focus"));
+    const can = state.focus != null || state.sel?.kind === "report";
+    $("#v-focus").disabled = !can;
+    $("#v-focus").title = can ? "Focus graph" : "Select a report first";
+  }
+  function renderTrail() {
+    const t = $("#trail");
+    t.hidden = state.view !== "focus" || !state.trail.length;
+    t.innerHTML = `<span class="label" style="margin-right:4px">Focus</span>` + state.trail.map((j, k) => `${k ? "<span aria-hidden='true'>›</span>" : ""}<button type="button" data-act="trail" data-i="${j}" ${j === state.focus ? 'aria-current="true"' : ""}>${esc(R[j].acn)}</button>`).join("");
+  }
+  function renderHud() {
+    updateViews();
+    const hl = highlightSet();
+    const parts = [];
+    if (state.view === "map") {
+      parts.push(`<span><b>${N.toLocaleString()}</b> reports · <b>${REG.length}</b> regions</span>`);
+      if (hl) parts.push(`<span><b>${hl.size}</b> lit</span>`);
+      if (state.sel?.kind === "factor") parts.push(`<span><b>${post[state.sel.id].length}</b> with ${esc(clip(short(F[state.sel.id].label), 40))}</span>`);
+      parts.push(`<span>scroll or pinch to zoom · drag to pan · double-click a dot to focus</span>`);
+    } else {
+      parts.push(`<span>center <b>${esc(R[state.focus].acn)}</b> · <b>${focus.rel.length}</b> related reports · <b>${focus.hubs.length}</b> shared factors</span>`);
+      if (focus.req.length) parts.push(`<span>must share: ${focus.req.map(f => esc(short(F[f].label))).join(", ")}</span>`);
+      parts.push(`<span>drag nodes · hover to trace links · double-click a report to re-center</span>`);
+    }
+    parts.push(`<span><b>${META.n_llm_coded.toLocaleString()}</b> coded by the local LLM</span>`);
+    $("#hud").innerHTML = parts.join("");
+  }
+  function buildLeft() {
+    $("#examples").innerHTML = (META.examples || []).filter(x => byAcn.has(x.acn)).map(x => `<button type="button" data-act="focus" data-i="${byAcn.get(x.acn)}"><span>${esc(x.label)}</span><span class="n">${esc(x.acn)}</span></button>`).join("");
+    $("#regions").innerHTML = REG.map(c => `<button type="button" data-act="region" data-id="${c.id}"><span>${esc(c.label)}</span><span class="n">${c.n}</span></button>`).join("");
+    $("#weights").innerHTML = TYPES.map(t => `<div class="wrow" id="row-${t.id}"><span class="swatch${t.text ? " dash" : ""}" style="--c:${COL[t.id]}"></span><label for="w-${t.id}">${esc(t.label)}<small id="wv-${t.id}"></small></label><input type="range" id="w-${t.id}" min="0" max="3" step="1" value="${t.def}"></div>`).join("");
+    TYPES.forEach(t => $(`#w-${t.id}`).addEventListener("input", e => { state.w[t.id] = STEPS[+e.target.value]; weightsChanged(); }));
+    $("#legend").innerHTML = `<span><i class="shape round" style="--c:${INK}"></i>Report</span><span><i class="shape sq" style="--c:${INK2}"></i>Shared factor</span>`
+      + TYPES.map(t => `<span><i class="${t.text ? "swatch dash" : "shape sq"}" style="--c:${COL[t.id]}"></i>${esc(t.label)}</span>`).join("");
+    $("#about").innerHTML = `
+      <p><strong>Reports.</strong> ${esc(META.scope)}. Source: ${esc(META.source)}. ASRS reports are voluntary and unverified, so counts here say nothing about how often anything happens.</p>
+      <p><strong>Map.</strong> Reports are placed by how similar their narratives are (t-SNE). Regions are dense areas, named after the analyst codes most over-represented in them.</p>
+      <p><strong>Links.</strong> Two reports link through every factor they share; a rare shared factor counts for more than a common one. ASRS analysts coded event type, phase, human factors, weather, components (mapped here to ATA chapters) and outcome. ${esc(META.llm)} read each narrative and added the approach being flown, CRM and automation problems, and a short sequence of events; a label is kept only if its quote is in the report and says what the label claims. Text similarity uses ${esc(META.embeddings)}.</p>
+      <p><strong>Use with care.</strong> A link means two reports resemble each other, not that they share a cause. Read the narratives before drawing conclusions. Not affiliated with NASA.</p>`;
+    paintWeights();
+  }
+  function paintWeights() {
+    TYPES.forEach(t => {
+      const step = STEPS.indexOf(state.w[t.id]);
+      const input = $(`#w-${t.id}`);
+      if (+input.value !== step) input.value = step;
+      input.setAttribute("aria-valuetext", STEP_NAMES[step]);
+      $(`#row-${t.id}`).classList.toggle("off", !state.w[t.id]);
+      $(`#wv-${t.id}`).textContent = STEP_NAMES[step] + (t.id === "sequence" ? ` · ${META.n_llm_coded.toLocaleString()} coded` : "");
+    });
+  }
+  function weightsChanged() {
+    state.wver++; paintWeights();
+    if (state.view === "focus") buildFocus(state.focus);
+    renderInspector(); renderHud(); requestDraw();
+  }
+  $("#reset-w").onclick = () => { TYPES.forEach(t => { state.w[t.id] = STEPS[t.def]; }); weightsChanged(); };
+  $("#n-rel").oninput = e => { state.nRel = +e.target.value; $("#n-rel-out").textContent = state.nRel; if (state.view === "focus") { buildFocus(state.focus); renderHud(); requestDraw(); } };
+  $("#n-hub").oninput = e => { state.nHubs = +e.target.value; $("#n-hub-out").textContent = state.nHubs; if (state.view === "focus") { buildFocus(state.focus); renderHud(); requestDraw(); } };
+  $("#text-links").onchange = e => { state.textLinks = e.target.checked; if (state.view === "focus") { buildFocus(state.focus); requestDraw(); } };
+  $("#v-map").onclick = () => setView("map");
+  $("#v-focus").onclick = () => setView("focus");
+  function setLeft(open) {
+    $("#left").hidden = !open;
+    $("#t-left").setAttribute("aria-pressed", String(open));
+    stage.classList.toggle("no-left", !open);
+  }
+  $("#t-left").onclick = () => setLeft($("#left").hidden);
+  $("#z-in").onclick = () => d3.select(cv).transition().duration(reduceMotion ? 0 : 250).call(zoom.scaleBy, 1.35);
+  $("#z-out").onclick = () => d3.select(cv).transition().duration(reduceMotion ? 0 : 250).call(zoom.scaleBy, 1 / 1.35);
+  $("#z-fit").onclick = () => fitScene(true);
+
+  // ------------------------------------------------------------------ boot
+  $("#brand-sub").textContent = `${N.toLocaleString()} NASA ASRS reports · approach & landing`;
+  setLeft(window.innerWidth > 1100);
+  buildLeft(); renderChips();
+  resize();
+  new ResizeObserver(resize).observe(cv);
+  const mFocus = location.hash.match(/^#focus(\d+)$/), mAcn = location.hash.match(/^#acn(\d+)$/);
+  if (mFocus && byAcn.has(mFocus[1])) openFocus(byAcn.get(mFocus[1]));
+  else {
+    fitScene(false);
+    if (mAcn && byAcn.has(mAcn[1])) selectReport(byAcn.get(mAcn[1]));
+    else { renderInspector(); renderHud(); }
+  }
+  if (document.fonts && document.fonts.ready) document.fonts.ready.then(requestDraw);
+})();
+</script>
+</body>
+</html>

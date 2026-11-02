@@ -29,6 +29,19 @@ MarketView layer; this copy omits that module and any internal paths. To refresh
 `python3 build_platform.py --public` in the BData repo's `women opportunity/platform/` folder, then
 replace this directory. Keep `index.html` and `vendor/` together.
 
+`asrs-precedent-graph/` is the ASRS Precedent Graph at `/portfolio/asrs-precedent-graph/`, a
+search-first graph explorer over 3,000 NASA ASRS approach-and-landing reports (January 2012 to
+March 2022, from the Apache-2.0 `elihoole/asrs-aviation-reports` dataset). Reports link through
+the ASRS analyst codes they share (components mapped to ATA chapters), through the approach type,
+CRM and automation factors and event sequences that a local LLM (Qwen3-4B-Instruct, 4-bit MLX)
+coded from each narrative, each label kept only if a quote from the report supports it, and
+through narrative similarity (MPNet plus TF-IDF). It runs entirely in the browser:
+`data/graph.json` holds the factors, neighbour lists and map coordinates, `data/narratives.json`
+loads when a reader opens a narrative, and d3 is vendored under `vendor/`. To refresh it, rerun
+the graph-explorer pipeline (see its README), then run
+`python export_static.py <this repo>/portfolio/asrs-precedent-graph --home` from its `pipeline/`
+folder, which replaces `index.html`, `data/` and `vendor/`. Keep the three together.
+
 The hosted FoodBridge app is the Next.js project at `apps/foodbridge/` (manager workspace,
 shelf portal, and findings). It ships county and tract aggregates only: no site identifiers,
 census blocks, or licensed Map the Meal Gap values. Rebuild the bundle in the Maverick
