@@ -3,8 +3,9 @@
 A knowledge graph extracted by a local LLM from every NASA ASRS report in the Apache-2.0
 [`elihoole/asrs-aviation-reports`](https://huggingface.co/datasets/elihoole/asrs-aviation-reports)
 dataset (47,723 reports after cleaning). It was produced by the CIS 634
-[`asrsbench`](https://github.com/Jacob19999/cis634) project and is not yet wired into the
-[ASRS Precedent Graph](../portfolio/asrs-precedent-graph/) page.
+[`asrsbench`](https://github.com/Jacob19999/cis634) project, and the
+[ASRS Precedent Graph](../portfolio/asrs-precedent-graph/) page is built from it with
+`scripts/export_precedent_graph.py` there.
 
 | File | Contents |
 | --- | --- |
@@ -59,10 +60,10 @@ traffic conflict (1,829). The most common causes are frequency congestion (1,902
 
 - Free-text phrases are not normalised: "communication failure", "poor communication" and
   "miscommunication" are separate values. Cluster or map them before using them as graph nodes.
-- Labels are not backed by quotes, unlike the Precedent Graph's 3,000-report coding, and have
-  not been checked by hand.
-- The schema differs from the Precedent Graph's factor layers, so this file cannot replace its
-  `data/graph.json` directly.
+- Labels are not backed by quotes, unlike the earlier 3,000-report Precedent Graph coding, and
+  have not been checked by hand.
+- The exporter turns frequent phrases (in at least 50 reports, near-duplicates merged) into the
+  page's AI factors; rarer phrases appear only in this file.
 
 ## Rerunning
 

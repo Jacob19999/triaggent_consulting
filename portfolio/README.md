@@ -35,17 +35,24 @@ encrypted `index.html` and `vendor/` here. Never copy the plaintext build into t
 `index.html` and `vendor/` together.
 
 `asrs-precedent-graph/` is the ASRS Precedent Graph at `/portfolio/asrs-precedent-graph/`, a
-search-first graph explorer over 3,000 NASA ASRS approach-and-landing reports (January 2012 to
-March 2022, from the Apache-2.0 `elihoole/asrs-aviation-reports` dataset). Reports link through
-the ASRS analyst codes they share (components mapped to ATA chapters), through the approach type,
-CRM and automation factors and event sequences that a local LLM (Qwen3-4B-Instruct, 4-bit MLX)
-coded from each narrative, each label kept only if a quote from the report supports it, and
-through narrative similarity (MPNet plus TF-IDF). It runs entirely in the browser:
-`data/graph.json` holds the factors, neighbour lists and map coordinates, `data/narratives.json`
-loads when a reader opens a narrative, and d3 is vendored under `vendor/`. To refresh it, rerun
-the graph-explorer pipeline (see its README), then run
-`python export_static.py <this repo>/portfolio/asrs-precedent-graph --home` from its `pipeline/`
-folder, which replaces `index.html`, `data/` and `vendor/`. Keep the three together.
+search-first graph explorer over all 47,723 NASA ASRS reports in the Apache-2.0
+`elihoole/asrs-aviation-reports` dataset (every flight phase). Reports link through the ASRS
+analyst codes they share (components mapped to ATA chapters), through the event, cause and
+equipment phrases that a local LLM (Qwen3-8B, 4-bit, Ollama) named in each narrative, and
+through narrative similarity (MPNet plus TF-IDF LSA) and similarity of the LLM's
+cause-and-effect links. The LLM labels are not backed by quotes or checked by hand. It runs
+entirely in the browser: `data/graph.json` holds the factors, neighbour lists and map
+coordinates, `data/narratives/<k>.json` holds the narratives in shards of 250 reports that load
+when a reader opens one, and d3 is vendored under `vendor/`.
+
+The data is built by `scripts/export_precedent_graph.py` in
+[Jacob19999/cis634](https://github.com/Jacob19999/cis634) from the LLM extraction in
+`asrs-graph/` (see [../asrs-graph/README.md](../asrs-graph/README.md)): run
+`python scripts/export_precedent_graph.py <this repo>/portfolio/asrs-precedent-graph` there.
+It rewrites `data/` only; `index.html` carries the page edits for the 47,723-report build
+(sharded narratives, LLM blocks without quotes). The earlier 3,000-report build came from a
+separate graph-explorer pipeline whose `export_static.py` replaces `index.html` too, so don't
+rerun that one over this build.
 
 The hosted FoodBridge app is the Next.js project at `apps/foodbridge/` (manager workspace,
 shelf portal, and findings). It ships county and tract aggregates only: no site identifiers,

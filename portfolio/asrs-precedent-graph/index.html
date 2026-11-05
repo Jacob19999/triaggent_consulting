@@ -3,9 +3,9 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta name="description" content="Search 3,000 NASA ASRS approach-and-landing safety reports and see which ones resemble each other, linked through shared factors coded by local language models.">
+<meta name="description" content="Search all 47,723 NASA ASRS safety reports and see which ones resemble each other, linked through shared analyst codes, factors coded by a local language model, and narrative similarity.">
 <meta property="og:title" content="ASRS Precedent Graph">
-<meta property="og:description" content="Search 3,000 NASA ASRS approach-and-landing safety reports and see which ones resemble each other, linked through shared factors coded by local language models.">
+<meta property="og:description" content="Search all 47,723 NASA ASRS safety reports and see which ones resemble each other, linked through shared analyst codes, factors coded by a local language model, and narrative similarity.">
 <meta property="og:type" content="website">
 <title>ASRS Precedent Graph</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -225,7 +225,7 @@ details.narr .narr-text { margin-top: 8px; font-size: var(--fs-sm); line-height:
     <a class="iconbtn" href="/" style="text-decoration:none" aria-label="Back to the Triaggent homepage">&larr; Triaggent</a>
     <div class="brand">
       <svg width="24" height="24" viewBox="0 0 24 24" aria-hidden="true"><g fill="none" stroke="#b4bcc5" stroke-width="1.3"><path d="M5 17 12 6l7 11M5 17h14M12 6v11"/></g><circle cx="12" cy="6" r="2.6" fill="#e9ecf0"/><rect x="2.6" y="14.6" width="4.8" height="4.8" rx="1" fill="#3987e5"/><rect x="16.6" y="14.6" width="4.8" height="4.8" rx="1" fill="#d95926"/><circle cx="12" cy="17" r="1.8" fill="#199e70"/></svg>
-      <div><h1>ASRS Precedent Graph</h1><small id="brand-sub">NASA ASRS · approach &amp; landing</small></div>
+      <div><h1>ASRS Precedent Graph</h1><small id="brand-sub">NASA ASRS · all flight phases</small></div>
     </div>
     <div class="omni-wrap">
       <div class="omni" id="omni">
@@ -300,7 +300,7 @@ details.narr .narr-text { margin-top: 8px; font-size: var(--fs-sm); line-height:
     { id: "human", label: "Human factors & CRM", def: 2 },
     { id: "system", label: "Aircraft system", def: 2 },
     { id: "weather", label: "Weather & light", def: 2 },
-    { id: "approach", label: "Approach & automation", def: 2 },
+    { id: "approach", label: "Route, navigation & automation", def: 2 },
     { id: "event", label: "Event type", def: 2 },
     { id: "response", label: "Crew response & outcome", def: 1 },
     { id: "sequence", label: "Similar sequence of events", def: 2, text: true },
@@ -845,7 +845,7 @@ details.narr .narr-text { margin-top: 8px; font-size: var(--fs-sm); line-height:
   // ------------------------------------------------------------------ search palette
   const q = $("#q"), pal = $("#palette");
   let palItems = [], palIdx = 0, timer = 0;
-  const POPULAR = ["Flying RNP / RNAV (GPS) approach", "Communication breakdown: flight crew ↔ flight crew", "Unstabilized approach",
+  const POPULAR = ["Runway incursion", "Communication breakdown: flight crew ↔ flight crew", "Unstabilized approach",
     "Windshear", "ATA 32 Landing gear & brakes", "Go-around / missed approach", "Wake vortex encounter", "CFIT / CFTT"];
   const QUERIES = ["rnav", "hydraulic", "windshear", "go around", "737", "DEN", "fatigue", "tcas"];
   const SEARCH_ICON = `<svg width="12" height="12" viewBox="0 0 16 16" aria-hidden="true"><circle cx="7" cy="7" r="4.6" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="m10.5 10.5 3.2 3.2" stroke="currentColor" stroke-width="1.6"/></svg>`;
@@ -939,12 +939,14 @@ details.narr .narr-text { margin-top: 8px; font-size: var(--fs-sm); line-height:
   }
 
   // ------------------------------------------------------------------ inspector
-  let narratives = null;
+  // Narratives are split into shards of META.shard reports (by position in R), fetched on demand.
+  const shards = new Map();
   async function loadNarrative(acn, el) {
     try {
-      if (!narratives) narratives = await fetch("data/narratives.json").then(r => r.json());
-      el.textContent = narratives[acn] || "No narrative on file.";
-    } catch (e) { el.textContent = "Could not load the narratives file."; }
+      const k = Math.floor(byAcn.get(acn) / META.shard);
+      if (!shards.has(k)) shards.set(k, fetch(`data/narratives/${k}.json`).then(r => { if (!r.ok) throw new Error(r.status); return r.json(); }));
+      el.textContent = (await shards.get(k))[acn] || "No narrative on file.";
+    } catch (e) { shards.clear(); el.textContent = "Could not load the narrative."; }
   }
   const fchip = (f, on = false) => `<button type="button" class="fchip${on ? " on" : ""}" style="--c:${COL[F[f].layer]}" data-act="factor" data-f="${f}" title="${esc(TI[F[f].layer].label)} · on ${F[f].df} reports">${esc(short(F[f].label))}${F[f].src === "llm" ? ' <span class="ai">AI</span>' : ""}</button>`;
   const rowHTML = i => `<button type="button" class="row" data-act="report" data-i="${i}"><span class="acn">${esc(R[i].acn)}</span><span class="rt">${esc(R[i].synopsis)}</span><span class="rm">${esc(R[i].date)} · ${esc(R[i].aircraft)}</span></button>`;
@@ -966,11 +968,11 @@ details.narr .narr-text { margin-top: 8px; font-size: var(--fs-sm); line-height:
   const byDate = ids => ids.slice().sort((a, b) => (R[b].date > R[a].date ? 1 : R[b].date < R[a].date ? -1 : 0));
 
   function llmBlock(r) {
-    const quoted = r.f.filter(f => F[f].src === "llm" && r.q && r.q[f]);
-    if (!r.events && !quoted.length) return `<div class="block"><p class="label">Local LLM</p><p class="hint">Not coded yet: the local model has read ${META.n_llm_coded.toLocaleString()} of ${N.toLocaleString()} reports so far.</p></div>`;
-    const qs = quoted.length ? `<ul class="quotes">${quoted.map(f => `<li>${fchip(f)} <q>${esc(r.q[f])}</q></li>`).join("")}</ul>` : `<p class="hint">No approach type, CRM or automation factor that the report's own words support.</p>`;
-    const ev = r.events?.length ? `<div class="block"><p class="label">Sequence of events · LLM summary</p><ol class="events">${r.events.map(e => `<li>${esc(e)}</li>`).join("")}</ol></div>` : "";
-    return `<div class="block"><p class="label">Coded by the local LLM, each with its quote</p>${qs}</div>${ev}`;
+    const coded = r.f.filter(f => F[f].src === "llm").sort((a, b) => F[b].idf - F[a].idf);
+    if (!r.events && !coded.length) return `<div class="block"><p class="label">Local LLM</p><p class="hint">Not coded yet: the local model has read ${META.n_llm_coded.toLocaleString()} of ${N.toLocaleString()} reports so far.</p></div>`;
+    const fs = coded.length ? `<div class="fchips">${coded.map(f => fchip(f)).join("")}</div><p class="hint">Events, causes and equipment the model named in the narrative. Not checked by hand; read the narrative to confirm.</p>` : `<p class="hint">No event, cause or equipment phrase common enough to link reports.</p>`;
+    const ev = r.events?.length ? `<div class="block"><p class="label">Cause and effect · LLM summary</p><ol class="events">${r.events.map(e => `<li>${esc(e)}</li>`).join("")}</ol></div>` : "";
+    return `<div class="block"><p class="label">Coded by the local LLM</p>${fs}</div>${ev}`;
   }
   function factorGroups(r, shared) {
     return TYPES.filter(t => !t.text).map(t => {
@@ -989,7 +991,7 @@ details.narr .narr-text { margin-top: 8px; font-size: var(--fs-sm); line-height:
       return `<div class="group"><div class="group-h"><span class="swatch${t.text ? " dash" : ""}" style="--c:${COL[t.id]}"></span>${esc(t.label)}<span class="val">${pct}</span></div>${body}</div>`;
     }).join("");
     const s = R[centre], r = R[c.j];
-    const seq = (s.events || r.events) ? `<div class="block"><p class="label">Sequence of events · LLM summaries</p><div class="seq-pair">
+    const seq = (s.events || r.events) ? `<div class="block"><p class="label">Cause and effect · LLM summaries</p><div class="seq-pair">
       <div><span class="label">Center ${esc(s.acn)}</span>${s.events ? `<ol class="events">${s.events.map(e => `<li>${esc(e)}</li>`).join("")}</ol>` : `<p class="hint">Not coded yet.</p>`}</div>
       <div><span class="label">This ${esc(r.acn)}</span>${r.events ? `<ol class="events">${r.events.map(e => `<li>${esc(e)}</li>`).join("")}</ol>` : `<p class="hint">Not coded yet.</p>`}</div></div></div>` : "";
     return `<div class="block"><p class="label">Why it links to ACN ${esc(s.acn)}</p><div class="strength"><span>strength ${c.total.toFixed(2)}</span><div class="bar" role="img" aria-label="Share of the link by type">${segs(c)}</div></div>${groups}</div>${seq}`;
@@ -1043,7 +1045,7 @@ details.narr .narr-text { margin-top: 8px; font-size: var(--fs-sm); line-height:
     return `<div class="ihead"><span class="label">${N.toLocaleString()} safety reports</span><h2>Find reports that resemble each other, and see why</h2></div>
       <ol class="tips">
         <li><b>Search</b> for a factor, an aircraft, an airport or any word. Matching reports light up on the map as you type. Press <kbd>/</kbd> to start.</li>
-        <li><b>Combine</b> factors as filters: pick “Flying RNP / RNAV (GPS) approach”, then add a CRM or weather factor.</li>
+        <li><b>Combine</b> factors as filters: pick “Runway incursion”, then add a human-factor or weather factor.</li>
         <li><b>Open a report</b> and choose Focus to see the reports most like it, joined through the factors they share.</li>
       </ol>
       <div class="block"><p class="label">Try a search</p><div class="qbtns">${QUERIES.map(w => `<button type="button" data-act="query" data-q="${esc(w)}">${esc(w)}</button>`).join("")}</div></div>
@@ -1122,7 +1124,7 @@ details.narr .narr-text { margin-top: 8px; font-size: var(--fs-sm); line-height:
     $("#about").innerHTML = `
       <p><strong>Reports.</strong> ${esc(META.scope)}. Source: ${esc(META.source)}. ASRS reports are voluntary and unverified, so counts here say nothing about how often anything happens.</p>
       <p><strong>Map.</strong> Reports are placed by how similar their narratives are (t-SNE). Regions are dense areas, named after the analyst codes most over-represented in them.</p>
-      <p><strong>Links.</strong> Two reports link through every factor they share; a rare shared factor counts for more than a common one. ASRS analysts coded event type, phase, human factors, weather, components (mapped here to ATA chapters) and outcome. ${esc(META.llm)} read each narrative and added the approach being flown, CRM and automation problems, and a short sequence of events; a label is kept only if its quote is in the report and says what the label claims. Text similarity uses ${esc(META.embeddings)}.</p>
+      <p><strong>Links.</strong> Two reports link through every factor they share; a rare shared factor counts for more than a common one. ASRS analysts coded event type, phase, human factors, route and navigation, weather, components (mapped here to ATA chapters) and outcome. ${esc(META.llm)} read each narrative and named the events, causes and equipment involved, plus a few cause-and-effect links; phrases common enough to link reports become the factors marked AI. The model's labels are not backed by quotes or checked by hand. Text similarity uses ${esc(META.embeddings)}.</p>
       <p><strong>Use with care.</strong> A link means two reports resemble each other, not that they share a cause. Read the narratives before drawing conclusions. Not affiliated with NASA.</p>`;
     paintWeights();
   }
@@ -1158,7 +1160,7 @@ details.narr .narr-text { margin-top: 8px; font-size: var(--fs-sm); line-height:
   $("#z-fit").onclick = () => fitScene(true);
 
   // ------------------------------------------------------------------ boot
-  $("#brand-sub").textContent = `${N.toLocaleString()} NASA ASRS reports · approach & landing`;
+  $("#brand-sub").textContent = `${N.toLocaleString()} NASA ASRS reports · all flight phases`;
   setLeft(window.innerWidth > 1100);
   buildLeft(); renderChips();
   resize();
