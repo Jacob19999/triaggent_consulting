@@ -43,7 +43,9 @@ through narrative similarity (MPNet plus TF-IDF LSA) and similarity of the LLM's
 cause-and-effect links. The LLM labels are not backed by quotes or checked by hand. It runs
 entirely in the browser: `data/graph.json` holds the factors, neighbour lists and map
 coordinates, `data/narratives/<k>.json` holds the narratives in shards of 250 reports that load
-when a reader opens one, and d3 is vendored under `vendor/`.
+when a reader opens one, and d3 is vendored under `vendor/`. The Explore panel filters by year,
+local time of day, state or region, and airport or facility code (named in 42% of reports; ASRS
+withholds the rest); these filters also narrow the related-report lists and the focus graph.
 
 The data is built by `scripts/export_precedent_graph.py` in
 [Jacob19999/cis634](https://github.com/Jacob19999/cis634) from the LLM extraction in

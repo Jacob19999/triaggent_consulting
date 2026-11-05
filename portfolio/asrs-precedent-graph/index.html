@@ -122,6 +122,18 @@ mark { background: none; color: var(--lit); font-weight: 600; }
 .setrow output { text-align: right; }
 .check { display: flex; align-items: center; gap: 8px; font-size: var(--fs-sm); cursor: pointer; }
 .check input { accent-color: var(--ink-2); }
+/* Date, time and place filters: each one also shows as a chip in the search bar. */
+.filters { display: flex; flex-direction: column; gap: 8px; }
+.frow { display: grid; grid-template-columns: 52px minmax(0, 1fr); align-items: center; gap: 6px 8px; font-size: var(--fs-sm); color: var(--ink-2); }
+.frow .pair { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); align-items: center; gap: 6px; }
+.frow .pair span { color: var(--muted); font-size: var(--fs-xs); }
+.filters select, .filters input { width: 100%; min-width: 0; box-sizing: border-box; height: 30px; padding: 0 8px; background: var(--raised); border: 1px solid var(--line); border-radius: 6px; color: var(--ink); font-size: var(--fs-sm); }
+.filters select:focus-visible, .filters input:focus-visible { outline: 2px solid var(--ink); outline-offset: 1px; }
+.filters input::placeholder { color: var(--muted); }
+.tods { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 4px; }
+.tods button { height: 30px; padding: 0; border: 1px solid var(--line); border-radius: 6px; background: var(--raised); color: var(--ink-2); cursor: pointer; font: 400 var(--fs-xs)/1 var(--font-mono); }
+.tods button:hover { border-color: var(--ink-2); }
+.tods button[aria-pressed="true"] { background: var(--ink); border-color: var(--ink); color: var(--on-ink); font-weight: 500; }
 .legend { display: grid; grid-template-columns: 1fr 1fr; gap: 5px 10px; font-size: var(--fs-xs); color: var(--ink-2); }
 .legend span { display: inline-flex; align-items: center; gap: 6px; min-width: 0; }
 .shape { display: inline-block; width: 9px; height: 9px; flex: none; background: var(--c, var(--ink-2)); }
@@ -249,6 +261,16 @@ details.narr .narr-text { margin-top: 8px; font-size: var(--fs-sm); line-height:
 
     <aside class="side left" id="left" aria-label="Explore and link settings">
       <section>
+        <div class="label-row"><p class="label">Date, time and place</p><button type="button" class="linkbtn" id="f-clear" hidden>Clear</button></div>
+        <div class="filters">
+          <div class="frow"><span id="f-date-l">Date</span><div class="pair" role="group" aria-labelledby="f-date-l"><select id="f-from" aria-label="From year"></select><span>to</span><select id="f-to" aria-label="To year"></select></div></div>
+          <div class="frow"><span id="f-tod-l">Time</span><div class="tods" id="f-tod" role="group" aria-labelledby="f-tod-l"></div></div>
+          <div class="frow"><label for="f-state">Place</label><select id="f-state"></select></div>
+          <div class="frow"><label for="f-apt">Airport</label><input id="f-apt" list="f-apt-list" autocomplete="off" spellcheck="false" placeholder="Code, e.g. DEN or ZLA"><datalist id="f-apt-list"></datalist></div>
+          <p class="hint" id="f-note">Local time of day. ASRS withholds the airport in most reports, so the airport filter covers only those that name one.</p>
+        </div>
+      </section>
+      <section>
         <p class="label">Start here</p>
         <div class="list" id="examples"></div>
       </section>
@@ -340,7 +362,8 @@ details.narr .narr-text { margin-top: 8px; font-size: var(--fs-sm); line-height:
     r.narMap = new Map(r.nar || []);
     r.seqMap = new Map(r.seq || []);
     r.syn = r.synopsis.toLowerCase();
-    r.hay = ` ${r.acn} ${r.aircraft} ${r.synopsis} ${r.f.map(f => F[f].label).join(" ")} ${(r.events || []).join(" ")}`.toLowerCase();
+    r.yr = +r.date.slice(0, 4);
+    r.hay = ` ${r.acn} ${r.aircraft} ${r.loc || ""} ${r.synopsis} ${r.f.map(f => F[f].label).join(" ")} ${(r.events || []).join(" ")}`.toLowerCase();
     r.wx = r.xy[0] * WORLD;
     r.wy = r.xy[1] * WORLD;
   });
@@ -352,6 +375,16 @@ details.narr .narr-text { margin-top: 8px; font-size: var(--fs-sm); line-height:
   R.forEach(r => { if (r.cl != null && regMembers.has(r.cl)) regMembers.get(r.cl).push(r.i); });
   // Sharing one factor that ~2% of reports have is enough to max out a link type.
   const IDF_REF = Math.log((N + 1) / (N / 50 + 1));
+  // Date, time and place filters. Unlike factor, region and text chips, these also narrow the
+  // related-report lists and the focus graph, so "similar reports, at night, in 2019" works.
+  const FILTER_KINDS = new Set(["date", "tod", "state", "apt"]);
+  const TOD = META.tod || [];
+  const TOD_SHORT = ["00–06", "06–12", "12–18", "18–24"];
+  const STATE = new Map((META.states || []).map(s => [s.id, s]));
+  const YEARS = [...new Set(R.map(r => r.yr))].sort((a, b) => a - b);
+  const LOCS = new Map();
+  R.forEach(r => { if (r.loc) LOCS.set(r.loc, (LOCS.get(r.loc) || 0) + 1); });
+  const whenWhere = r => [r.t != null ? `${TOD[r.t]} local` : "", r.loc || "", r.st ? (STATE.get(r.st)?.label || r.st) : ""].filter(Boolean).join(" · ");
   const short = l => l.replace(/^(Component|Location|Aircraft): /, "").replace("Communication breakdown:", "Comms breakdown:");
   const clip = (s, n) => s.length > n ? s.slice(0, n - 1) + "…" : s;
 
@@ -383,6 +416,7 @@ details.narr .narr-text { margin-top: 8px; font-size: var(--fs-sm); line-height:
     for (const [j, v] of S.seq || []) if (j !== s && !sib.has(j)) get(j).seq = v;
     const out = [];
     for (const c of C.values()) {
+      if (filterKeep && !filterKeep.has(c.j)) continue;
       if (req.size && ![...req].every(f => R[c.j].fs.has(f))) continue;
       const parts = {};
       let tot = 0;
@@ -430,21 +464,42 @@ details.narr .narr-text { margin-top: 8px; font-size: var(--fs-sm); line-height:
     textCache.set(q, out);
     return out;
   }
-  const chipMembers = c => c.kind === "factor" ? post[c.id] : c.kind === "region" ? (regMembers.get(c.id) || []) : textMatch(c.text);
-  let matchSet = null;
+  function filterMembers(c) {
+    const out = [];
+    for (const r of R) {
+      if (c.kind === "date" ? r.yr >= c.from && r.yr <= c.to
+        : c.kind === "tod" ? r.t != null && c.ids.includes(r.t)
+        : c.kind === "state" ? r.st === c.id
+        : r.loc === c.id) out.push(r.i);
+    }
+    return out;
+  }
+  const chipMembers = c => c.kind === "factor" ? post[c.id] : c.kind === "region" ? (regMembers.get(c.id) || [])
+    : FILTER_KINDS.has(c.kind) ? filterMembers(c) : textMatch(c.text);
+  let matchSet = null, filterKeep = null;
   function refreshMatches() {
-    matchSet = null;
+    matchSet = null; filterKeep = null;
     for (const c of state.chips) {
       const m = new Set(chipMembers(c));
       matchSet = matchSet ? new Set([...matchSet].filter(x => m.has(x))) : m;
+      if (FILTER_KINDS.has(c.kind)) filterKeep = filterKeep ? new Set([...filterKeep].filter(x => m.has(x))) : m;
     }
+    state.wver++; // related-report lists depend on the filters
   }
   function highlightSet() {
     if (state.preview) return matchSet ? new Set([...state.preview].filter(x => matchSet.has(x))) : state.preview;
     return matchSet;
   }
-  const chipColor = c => c.kind === "factor" ? COL[F[c.id].layer] : c.kind === "region" ? INK2 : LIT;
-  const chipLabel = c => c.kind === "factor" ? short(F[c.id].label) : c.kind === "region" ? regById.get(c.id).label : `“${c.text}”`;
+  const chipColor = c => c.kind === "factor" ? COL[F[c.id].layer] : c.kind === "region" || FILTER_KINDS.has(c.kind) ? INK2 : LIT;
+  function chipLabel(c) {
+    if (c.kind === "factor") return short(F[c.id].label);
+    if (c.kind === "region") return regById.get(c.id).label;
+    if (c.kind === "date") return c.from === c.to ? `Year ${c.from}` : `${c.from}–${c.to}`;
+    if (c.kind === "tod") return `Local ${c.ids.slice().sort().map(k => TOD_SHORT[k]).join(", ")}`;
+    if (c.kind === "state") return STATE.get(c.id)?.label || c.id;
+    if (c.kind === "apt") return `Airport ${c.id}`;
+    return `“${c.text}”`;
+  }
 
   // ------------------------------------------------------------------ canvas and zoom
   const stage = $("#stage"), cv = $("#cv"), ctx = cv.getContext("2d");
@@ -841,6 +896,13 @@ details.narr .narr-text { margin-top: 8px; font-size: var(--fs-sm); line-height:
     if (state.view === "focus") buildFocus(state.focus);
     renderInspector(); renderHud(); requestDraw();
   }
+  // At most one chip per filter kind: replace it, or drop it when c is null.
+  function setFilter(kind, c) {
+    const k = state.chips.findIndex(x => x.kind === kind);
+    if (!c) { if (k >= 0) removeChip(k); return; }
+    if (k >= 0) state.chips.splice(k, 1);
+    addChip(c);
+  }
 
   // ------------------------------------------------------------------ search palette
   const q = $("#q"), pal = $("#palette");
@@ -936,6 +998,60 @@ details.narr .narr-text { margin-top: 8px; font-size: var(--fs-sm); line-height:
   function renderChips() {
     $("#chips").innerHTML = state.chips.map((c, k) => `<span class="chip ${c.kind}" style="--c:${chipColor(c)}"><span class="dot"></span><span class="txt">${esc(chipLabel(c))}</span><button type="button" data-act="rm-chip" data-k="${k}" aria-label="Remove filter ${esc(chipLabel(c))}">×</button></span>`).join("");
     q.placeholder = state.chips.length ? "Add another filter…" : "Search reports, factors, aircraft, airports…";
+    syncFilters();
+  }
+
+  // ------------------------------------------------------------------ date, time and place filters
+  const fFrom = $("#f-from"), fTo = $("#f-to"), fTod = $("#f-tod"), fState = $("#f-state"), fApt = $("#f-apt");
+  function buildFilters() {
+    const yrs = YEARS.map(y => `<option value="${y}">${y}</option>`).join("");
+    fFrom.innerHTML = yrs; fTo.innerHTML = yrs;
+    fTod.innerHTML = TOD_SHORT.map((t, k) => `<button type="button" data-tod="${k}" aria-pressed="false" title="${esc(TOD[k] || t)} local time">${t}</button>`).join("");
+    fState.innerHTML = `<option value="">Anywhere</option>` + (META.states || []).slice().sort((a, b) => a.label.localeCompare(b.label))
+      .map(s => `<option value="${esc(s.id)}">${esc(s.label)} (${s.n.toLocaleString()})</option>`).join("");
+    $("#f-apt-list").innerHTML = [...LOCS].sort((a, b) => b[1] - a[1]).map(([c, n]) => `<option value="${esc(c)}">${n} report${n === 1 ? "" : "s"}</option>`).join("");
+    const onDate = () => {
+      let a = +fFrom.value, b = +fTo.value;
+      if (a > b) [a, b] = [b, a];
+      setFilter("date", a === YEARS[0] && b === YEARS[YEARS.length - 1] ? null : { kind: "date", from: a, to: b });
+    };
+    fFrom.onchange = onDate; fTo.onchange = onDate;
+    fTod.onclick = e => {
+      const b = e.target.closest("button[data-tod]");
+      if (!b) return;
+      const cur = state.chips.find(x => x.kind === "tod")?.ids || [];
+      const k = +b.dataset.tod;
+      const ids = cur.includes(k) ? cur.filter(x => x !== k) : [...cur, k];
+      setFilter("tod", ids.length ? { kind: "tod", ids } : null);
+    };
+    fState.onchange = () => setFilter("state", fState.value ? { kind: "state", id: fState.value } : null);
+    const onApt = () => {
+      const code = fApt.value.trim().toUpperCase();
+      if (!code) { setFilter("apt", null); return; }
+      if (!LOCS.has(code)) { $("#f-note").textContent = `No report names ${code}. ASRS withholds the airport in most reports.`; return; }
+      setFilter("apt", { kind: "apt", id: code });
+    };
+    fApt.onchange = onApt;
+    fApt.onkeydown = e => { if (e.key === "Enter") { e.preventDefault(); onApt(); } };
+    $("#f-clear").onclick = () => {
+      state.chips = state.chips.filter(c => !FILTER_KINDS.has(c.kind));
+      refreshMatches(); renderChips();
+      if (state.view === "focus") buildFocus(state.focus);
+      renderInspector(); renderHud(); requestDraw();
+    };
+  }
+  // Keep the panel controls in step with the chips (chips can also be removed from the search bar).
+  function syncFilters() {
+    const get = kind => state.chips.find(c => c.kind === kind);
+    const d = get("date"), t = get("tod"), s = get("state"), a = get("apt");
+    fFrom.value = String(d ? d.from : YEARS[0]); fTo.value = String(d ? d.to : YEARS[YEARS.length - 1]);
+    fTod.querySelectorAll("button").forEach(b => b.setAttribute("aria-pressed", String(!!t && t.ids.includes(+b.dataset.tod))));
+    fState.value = s ? s.id : "";
+    if (document.activeElement !== fApt) fApt.value = a ? a.id : "";
+    $("#f-clear").hidden = !(d || t || s || a);
+    $("#f-note").textContent = filterKeep
+      ? `${filterKeep.size.toLocaleString()} reports match. Related-report lists and the focus graph stay within them.`
+      : "Local time of day. ASRS withholds the airport in most reports, so the airport filter covers only those that name one.";
   }
 
   // ------------------------------------------------------------------ inspector
@@ -1008,7 +1124,7 @@ details.narr .narr-text { margin-top: 8px; font-size: var(--fs-sm); line-height:
     const sibs = (r.sib || []).map(j => `<button type="button" class="linkbtn" data-act="report" data-i="${j}">ACN ${esc(R[j].acn)}</button>`).join(", ");
     return `${back}
       <div class="ihead"><div class="eyebrow"><span class="label">${isCenter ? "Center report" : "Report"}</span>${reg ? `<button type="button" class="linkbtn" data-act="region" data-id="${reg.id}">${esc(reg.label)}</button>` : ""}</div>
-        <h2 class="mono">ACN ${esc(r.acn)}</h2><div class="meta">${esc(r.date)} · ${esc(r.aircraft)}</div></div>
+        <h2 class="mono">ACN ${esc(r.acn)}</h2><div class="meta">${esc(r.date)} · ${esc(r.aircraft)}</div>${whenWhere(r) ? `<div class="meta">${esc(whenWhere(r))}</div>` : ""}</div>
       <div class="actions">${isCenter ? `<button type="button" class="btn ghost" data-act="view-map">Show it on the map</button>` : `<button type="button" class="btn" data-act="focus" data-i="${i}">Focus graph on this report</button>`}</div>
       ${sibs ? `<p class="hint">Other reports of this same event: ${sibs}</p>` : ""}
       ${fn && fn.c ? whyBlock(fn.c, state.focus) : ""}
@@ -1162,7 +1278,7 @@ details.narr .narr-text { margin-top: 8px; font-size: var(--fs-sm); line-height:
   // ------------------------------------------------------------------ boot
   $("#brand-sub").textContent = `${N.toLocaleString()} NASA ASRS reports · all flight phases`;
   setLeft(window.innerWidth > 1100);
-  buildLeft(); renderChips();
+  buildLeft(); buildFilters(); renderChips();
   resize();
   new ResizeObserver(resize).observe(cv);
   const mFocus = location.hash.match(/^#focus(\d+)$/), mAcn = location.hash.match(/^#acn(\d+)$/);
