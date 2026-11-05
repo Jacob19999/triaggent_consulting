@@ -134,6 +134,20 @@ mark { background: none; color: var(--lit); font-weight: 600; }
 .tods button { height: 30px; padding: 0; border: 1px solid var(--line); border-radius: 6px; background: var(--raised); color: var(--ink-2); cursor: pointer; font: 400 var(--fs-xs)/1 var(--font-mono); }
 .tods button:hover { border-color: var(--ink-2); }
 .tods button[aria-pressed="true"] { background: var(--ink); border-color: var(--ink); color: var(--on-ink); font-weight: 500; }
+/* Map colour key: floats over the map (map view only) so its legend is visible on phones too. */
+.mapkey { position: absolute; z-index: 15; top: 12px; left: calc(var(--lw) + 12px); width: 232px; box-sizing: border-box; padding: 8px 10px 9px; background: var(--panel); border: 1px solid var(--line); border-radius: 10px; display: flex; flex-direction: column; gap: 6px; backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); }
+.mapkey .keyhead { display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: center; gap: 8px; }
+.mapkey select { min-width: 0; height: 26px; padding: 0 6px; background: var(--raised); border: 1px solid var(--line); border-radius: 6px; color: var(--ink); font-size: var(--fs-xs); }
+.keyitems { display: flex; flex-direction: column; gap: 2px; }
+.keyitems div { display: grid; grid-template-columns: 10px minmax(0, 1fr) auto; align-items: center; gap: 7px; font-size: var(--fs-xs); line-height: 1.35; color: var(--ink-2); }
+.keyitems i { width: 9px; height: 9px; border-radius: 50%; background: var(--c); }
+.keyitems span:last-child { font-family: var(--font-mono); color: var(--muted); }
+@media (max-width: 760px) {
+  .mapkey { width: auto; max-width: calc(100% - 24px); top: 8px; left: 12px; padding: 6px 8px; gap: 4px; }
+  .keyitems { flex-direction: row; flex-wrap: wrap; gap: 1px 10px; }
+  .keyitems div { grid-template-columns: 9px auto; gap: 5px; font-size: 11px; }
+  .keyitems span:last-child { display: none; }
+}
 .legend { display: grid; grid-template-columns: 1fr 1fr; gap: 5px 10px; font-size: var(--fs-xs); color: var(--ink-2); }
 .legend span { display: inline-flex; align-items: center; gap: 6px; min-width: 0; }
 .shape { display: inline-block; width: 9px; height: 9px; flex: none; background: var(--c, var(--ink-2)); }
@@ -258,6 +272,10 @@ details.narr .narr-text { margin-top: 8px; font-size: var(--fs-sm); line-height:
   <div class="stage" id="stage">
     <canvas id="cv" aria-label="Graph of safety reports. Use the search box and the inspector lists to navigate with a keyboard."></canvas>
     <nav class="trail" id="trail" aria-label="Reports you have focused" hidden></nav>
+    <div class="mapkey" id="mapkey" role="group" aria-label="Map colours">
+      <div class="keyhead"><label class="label" for="color-by">Colour</label><select id="color-by"></select></div>
+      <div class="keyitems" id="keyitems"></div>
+    </div>
 
     <aside class="side left" id="left" aria-label="Explore and link settings">
       <section>
@@ -391,7 +409,7 @@ details.narr .narr-text { margin-top: 8px; font-size: var(--fs-sm); line-height:
   const state = {
     view: "map", chips: [], preview: null, sel: null, hover: null, focus: null, trail: [],
     w: Object.fromEntries(TYPES.map(t => [t.id, STEPS[t.def]])), wver: 0,
-    nRel: 16, nHubs: 12, textLinks: true, listLimit: 30,
+    nRel: 16, nHubs: 12, textLinks: true, listLimit: 30, colorBy: "phase",
   };
 
   // ------------------------------------------------------------------ link scoring
@@ -614,21 +632,75 @@ details.narr .narr-text { margin-top: 8px; font-size: var(--fs-sm); line-height:
     ctx.fillStyle = color; ctx.fillText(text, x, y);
   }
 
+  // ------------------------------------------------------------------ map colours
+  // A scatter lets any two colours touch, so each mode uses at most three categorical slots
+  // (validated all-pairs on this background) plus grey for the rest, or a one-hue ramp for year.
+  const SLOT = ["#3987e5", "#d95926", "#199e70"], KEY_OTHER = "#5b6470";
+  const PHASE_GROUP = { "Parked": 0, "Taxi": 0, "Takeoff / Launch": 1, "Initial Climb": 1, "Climb": 1, "Cruise": 1,
+    "Descent": 2, "Initial Approach": 2, "Final Approach": 2, "Landing": 2 };
+  const PROBLEMS = ["Human Factors", "Aircraft", "Procedure"];
+  const COLOR_MODES = {
+    phase: { label: "Flight phase", other: "Several phases or not coded",
+      groups: [{ label: "On the ground (parked, taxi)", c: SLOT[0] }, { label: "Takeoff, climb & cruise", c: SLOT[1] }, { label: "Descent, approach & landing", c: SLOT[2] }],
+      of: r => { let g = -1; for (const f of r.f) { const p = F[f].layer === "phase" ? PHASE_GROUP[F[f].label] : undefined; if (p === undefined) continue; if (g >= 0 && g !== p) return -1; g = p; } return g; } },
+    problem: { label: "Primary problem", other: "Other or ambiguous",
+      groups: PROBLEMS.map((p, k) => ({ label: p === "Human Factors" ? "Human factors" : p, c: SLOT[k] })),
+      of: r => { for (const f of r.f) if (F[f].label.startsWith("Primary problem: ")) return PROBLEMS.indexOf(F[f].label.slice(17)); return -1; } },
+    time: { label: "Time of day", other: "Time not given",
+      groups: [{ label: "Night (18–06 local)", c: SLOT[0] }, { label: "Day (06–18 local)", c: SLOT[1] }],
+      of: r => r.t == null ? -1 : (r.t === 1 || r.t === 2 ? 1 : 0) },
+    year: { label: "Year", other: "",
+      groups: [["2012–13", "#184f95"], ["2014–15", "#256abf"], ["2016–17", "#3987e5"], ["2018–19", "#6da7ec"], ["2020–22", "#b7d3f6"]].map(([label, c]) => ({ label, c })),
+      of: r => r.yr <= 2013 ? 0 : r.yr <= 2015 ? 1 : r.yr <= 2017 ? 2 : r.yr <= 2019 ? 3 : 4 },
+    none: { label: "Nothing (grey)" },
+  };
+  let colorSets = null;
+  function cloud(ids, r, hl) {
+    ctx.beginPath();
+    for (const i of ids) {
+      if (hl && hl.has(i)) continue;
+      const [x, y] = scr(R[i].wx, R[i].wy);
+      if (!onScreen(x, y)) continue;
+      ctx.moveTo(x + r, y); ctx.arc(x, y, r, 0, TAU);
+    }
+  }
+  function setColorBy(mode) {
+    state.colorBy = COLOR_MODES[mode] ? mode : "phase";
+    try { localStorage.setItem("asrs-color-by", state.colorBy); } catch (e) {}
+    const m = COLOR_MODES[state.colorBy];
+    colorSets = null;
+    if (m.of) {
+      const groups = m.groups.map(() => []), other = [];
+      for (const r of R) { const g = m.of(r); (g >= 0 ? groups[g] : other).push(r.i); }
+      colorSets = { groups, other, order: groups.map((_, g) => g).sort((a, b) => groups[b].length - groups[a].length) };
+    }
+    $("#color-by").value = state.colorBy;
+    const item = (c, label, n) => `<div><i style="--c:${c}"></i><span>${esc(label)}</span><span>${n.toLocaleString()}</span></div>`;
+    $("#keyitems").innerHTML = colorSets
+      ? m.groups.map((g, k) => item(g.c, g.label, colorSets.groups[k].length)).join("") + (colorSets.other.length ? item(KEY_OTHER, m.other, colorSets.other.length) : "")
+      : "";
+    requestDraw();
+  }
+
   function drawMap() {
     const r = Math.max(1.5, Math.min(6, 2.0 * Math.sqrt(T.k)));
     const hl = highlightSet();
     const fsel = state.sel?.kind === "factor" ? state.sel.id : null;
     const rsel = state.sel?.kind === "report" ? state.sel.id : null;
     const quiet = hl || fsel != null || rsel != null;
-    ctx.beginPath();
-    for (const n of R) {
-      if (hl && hl.has(n.i)) continue;
-      const [x, y] = scr(n.wx, n.wy);
-      if (!onScreen(x, y)) continue;
-      ctx.moveTo(x + r, y); ctx.arc(x, y, r, 0, TAU);
+    if (colorSets) {
+      // Grey "other" first, then groups largest first so small groups stay visible on top.
+      // Colours recede while something is lit or selected, as the grey cloud does.
+      ctx.globalAlpha = quiet ? 0.2 : 0.45;
+      cloud(colorSets.other, r, hl); ctx.fillStyle = KEY_OTHER; ctx.fill();
+      ctx.globalAlpha = quiet ? 0.26 : 0.82;
+      for (const g of colorSets.order) { cloud(colorSets.groups[g], r, hl); ctx.fillStyle = COLOR_MODES[state.colorBy].groups[g].c; ctx.fill(); }
+      ctx.globalAlpha = 1;
+    } else {
+      cloud(R.map(n => n.i), r, hl);
+      ctx.fillStyle = quiet ? "rgba(118,128,140,0.30)" : "rgba(168,179,192,0.72)";
+      ctx.fill();
     }
-    ctx.fillStyle = quiet ? "rgba(118,128,140,0.30)" : "rgba(168,179,192,0.72)";
-    ctx.fill();
     drawRegionLabels(quiet ? 0.32 : 0.9);
     if (hl && hl.size) {
       dots(hl, r * 3, "rgba(255,233,184,0.10)");
@@ -1215,6 +1287,7 @@ details.narr .narr-text { margin-top: 8px; font-size: var(--fs-sm); line-height:
   }
   function renderHud() {
     updateViews();
+    $("#mapkey").hidden = state.view !== "map";
     const hl = highlightSet();
     const parts = [];
     if (state.view === "map") {
@@ -1279,6 +1352,11 @@ details.narr .narr-text { margin-top: 8px; font-size: var(--fs-sm); line-height:
   $("#brand-sub").textContent = `${N.toLocaleString()} NASA ASRS reports · all flight phases`;
   setLeft(window.innerWidth > 1100);
   buildLeft(); buildFilters(); renderChips();
+  $("#color-by").innerHTML = Object.entries(COLOR_MODES).map(([k, m]) => `<option value="${k}">${esc(m.label)}</option>`).join("");
+  $("#color-by").onchange = e => setColorBy(e.target.value);
+  let savedColor = null;
+  try { savedColor = localStorage.getItem("asrs-color-by"); } catch (e) {}
+  setColorBy(savedColor || "phase");
   resize();
   new ResizeObserver(resize).observe(cv);
   const mFocus = location.hash.match(/^#focus(\d+)$/), mAcn = location.hash.match(/^#acn(\d+)$/);

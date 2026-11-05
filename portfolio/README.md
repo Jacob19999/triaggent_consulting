@@ -45,7 +45,10 @@ entirely in the browser: `data/graph.json` holds the factors, neighbour lists an
 coordinates, `data/narratives/<k>.json` holds the narratives in shards of 250 reports that load
 when a reader opens one, and d3 is vendored under `vendor/`. The Explore panel filters by year,
 local time of day, state or region, and airport or facility code (named in 42% of reports; ASRS
-withholds the rest); these filters also narrow the related-report lists and the focus graph.
+withholds the rest); these filters also narrow the related-report lists and the focus graph. The map's colour key
+colours the points by flight phase (default), primary problem, time of day or year; a scatter
+lets any two colours touch, so each mode uses at most three categorical colours plus grey, or a
+one-hue ramp for year.
 
 The data is built by `scripts/export_precedent_graph.py` in
 [Jacob19999/cis634](https://github.com/Jacob19999/cis634) from the LLM extraction in
