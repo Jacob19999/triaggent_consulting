@@ -522,6 +522,8 @@ details.narr .narr-text { margin-top: 8px; font-size: var(--fs-sm); line-height:
   // ------------------------------------------------------------------ canvas and zoom
   const stage = $("#stage"), cv = $("#cv"), ctx = cv.getContext("2d");
   let W = 1, H = 1, DPR = 1, raf = 0, T = d3.zoomIdentity, dragging = false;
+  // Pixels a press may wander before it counts as a drag, and the simulation heat while dragging.
+  const DRAG_SLOP = 4, DRAG_HEAT = 0.1;
   const scenes = { map: { t: null }, focus: { t: null } };
   const focus = { nodes: [], links: [], byKey: new Map(), adj: new Map(), sim: null, rel: [], hubs: [], req: [] };
   const requestDraw = () => { if (!raf) raf = requestAnimationFrame(() => { raf = 0; draw(); }); };
@@ -536,9 +538,32 @@ details.narr .narr-text { margin-top: 8px; font-size: var(--fs-sm); line-height:
   d3.select(cv)
     .call(d3.drag().container(cv)
       .subject(e => { if (state.view !== "focus") return null; const n = hitFocus(e.x, e.y); return n ? { n, x: e.x, y: e.y } : null; })
-      .on("start", e => { dragging = true; hideTip(); if (!e.active) focus.sim.alphaTarget(0.25).restart(); e.subject.n.fx = e.subject.n.x; e.subject.n.fy = e.subject.n.y; })
-      .on("drag", e => { const [wx, wy] = T.invert([e.x, e.y]); e.subject.n.fx = wx; e.subject.n.fy = wy; requestDraw(); })
-      .on("end", e => { dragging = false; if (!e.active) focus.sim.alphaTarget(0); if (!e.subject.n.center) { e.subject.n.fx = null; e.subject.n.fy = null; } }))
+      // A press alone must not wake the simulation: d3-drag fires "start" on pointerdown, and a
+      // heated layout churns (the graph shakes and turns) for as long as the button is held. The
+      // simulation warms only once the pointer has moved a few pixels, and the node keeps its
+      // offset from the pointer so it does not jump to centre under it.
+      .clickDistance(DRAG_SLOP)
+      .on("start", e => {
+        dragging = true; hideTip();
+        const s = e.subject, [wx, wy] = T.invert([s.x, s.y]);
+        s.moved = false; s.ox = s.n.x - wx; s.oy = s.n.y - wy;
+      })
+      .on("drag", e => {
+        const s = e.subject;
+        if (!s.moved) {
+          if (Math.hypot(e.x - s.x, e.y - s.y) < DRAG_SLOP) return;
+          s.moved = true; focus.sim.alphaTarget(DRAG_HEAT).restart();
+        }
+        const [wx, wy] = T.invert([e.x, e.y]);
+        s.n.fx = wx + s.ox; s.n.fy = wy + s.oy; requestDraw();
+      })
+      .on("end", e => {
+        dragging = false;
+        const s = e.subject;
+        if (!s.moved) return;
+        focus.sim.alphaTarget(0);
+        if (!s.n.center) { s.n.fx = null; s.n.fy = null; }
+      }))
     .call(zoom).on("dblclick.zoom", null);
 
   // The part of the canvas no panel covers, so fits land in the open area.
