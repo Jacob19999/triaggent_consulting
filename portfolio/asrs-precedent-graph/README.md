@@ -17,6 +17,65 @@ Open `http://127.0.0.1:8765`. No JavaScript build or backend is required. D3 is 
 Reports load from `data/graph.json` (v1) or `data/reports/<k>.json` (v2). Narratives load on
 request from `data/narratives/<k>.json`; do not preload the narrative corpus into the browser.
 
+## Mobile workspace
+
+On phones, the default workspace keeps the map visible. The welcome content is behind the
+**Getting started** bar; selecting a report opens a smaller reading panel. **Show map**
+collapses that panel, **Full screen** expands it and **Split view** returns to the smaller
+panel. Opening **Focus** collapses the reading panel so the graph remains visible.
+
+**Map options** opens the colour key, source-intersection controls and severity overlay.
+Those controls start collapsed and include **Done · show map**. The **Filters** button
+(**Explore** on desktop) opens source/date/place filters and link settings with a sticky
+**Done** button. Opening either settings panel dismisses the other. Tapping the map outside
+Map options or pressing Escape dismisses the options. View buttons return to the graph
+without leaving the settings over it. Search sits above the view tabs and uses a shorter
+phone placeholder.
+
+The map refits on width changes such as rotation; a height change from the software keyboard
+keeps the camera. Desktop keeps its visible legend and side-by-side panels. Checks covered
+412 × 780 (an S22-sized browser area), 360 × 640, 320 × 640, landscape, desktop, search,
+report reading, Focus, settings and the tutorial.
+
+## First-visit mobile tutorial
+
+After the report collection loads, a first-time phone visitor can choose **Start tutorial**
+or **Skip to website**. The eight-step guide follows a safety investigator’s workflow on
+the live interface: choose Meaning or Keywords, describe an incident, select a real search
+result, read its summary, check the original text, read the t-SNE map, open Focus and
+interpret its connections. The optional “windshear” example uses Keywords and does not
+require a meaning-search model download.
+
+The map explanation covers report dots, approximate narrative similarity, colours, repeated
+region names, panning/zooming and selecting a report. It distinguishes the two-dimensional
+map from geography, time, severity and calibrated similarity scores. The Focus explanation
+covers report circles, shared-factor squares, solid factor links, dashed text links and
+following neighbours or adjusting link weights in Filters (Explore on desktop). Both views support investigation;
+their relationships do not establish incident identity or causality.
+
+The guide uses a spotlight and arrow around the actual control, supports Back, Exit and
+Escape, and keeps keyboard focus in the highlighted control and guide. Its card follows the
+visual viewport when the software keyboard opens. A pending or empty search provides a way
+back to edit the query. Original narratives still load only when their heading is opened.
+
+Skip, Exit and completion are remembered per browser/origin in local storage under
+`aviation-search-tutorial-v1`. If storage is unavailable, the guide still works, but a later
+visit may show the offer again. Desktop visits do not automatically show the offer.
+Visitors on any device can replay it from **ⓘ → Start guided search tutorial**.
+`onboarding.js` owns the guide; the small adapter in `index.html` uses the existing search,
+report and view actions. `onboarding.css` styles the overlay without changing the report data.
+
+For browser verification, use a fresh origin or clear this site's tutorial storage entry:
+
+1. At a phone viewport, check the first-visit Start/Skip choice; skip and reload to verify it
+   is remembered. A fresh desktop visit should open directly into the explorer.
+2. Replay from ⓘ, choose the Keywords example and select the highlighted report. Check its
+   summary and open the original text; the narrative should remain readable and scrollable.
+3. Continue through the map and Focus explanations. Check the selected report's Focus graph,
+   then finish and reload; the first-visit offer should remain dismissed.
+4. Check Back, Exit, Escape, a blank query, a query with no matches, keyboard navigation,
+   a 320px-wide phone and a reduced-height viewport representing the software keyboard.
+
 ## Search and linking
 
 - The circled info button beside the view controls opens a keyboard-accessible map guide.

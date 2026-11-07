@@ -302,7 +302,8 @@ details.narr .narr-text { margin-top: 8px; font-size: var(--fs-sm); line-height:
 .semantic-status {padding:5px 8px 10px;font-size:12px;color:var(--ink-2);}
 </style>
 <link rel="stylesheet" href="analytics.css">
-<link rel="stylesheet" href="mobile.css">
+<link rel="stylesheet" href="mobile.css?v=2">
+<link rel="stylesheet" href="onboarding.css">
 </head>
 <body>
 <div class="app">
@@ -335,7 +336,9 @@ details.narr .narr-text { margin-top: 8px; font-size: var(--fs-sm); line-height:
     <main id="analytics" aria-label="Safety analytics" hidden></main>
     <canvas id="cv" aria-label="Graph of safety reports. Use the search box and the inspector lists to navigate with a keyboard."></canvas>
     <nav class="trail" id="trail" aria-label="Reports you have focused" hidden></nav>
-    <div class="mapkey" id="mapkey" role="group" aria-label="Map colours">
+    <details class="mapkey" id="mapkey">
+      <summary class="map-options-toggle"><span>Map options</span><span class="map-options-value" id="map-options-value">Source</span><span aria-hidden="true">⌄</span></summary>
+      <div class="mapkey-content" role="group" aria-label="Map colours">
       <div class="keyhead"><label class="label" for="color-by">Colour</label><select id="color-by"></select></div>
       <div class="keyitems" id="keyitems"></div>
       <div id="source-overlap" hidden>
@@ -349,9 +352,12 @@ details.narr .narr-text { margin-top: 8px; font-size: var(--fs-sm); line-height:
         <p class="hint">Map distance is approximate. Similarity does not establish the same incident or a shared cause.</p></details>
         <p class="hint" id="source-severity-legend" hidden>Injury rings: <span class="injury-key"><i style="--size:5px"></i>minor <i style="--size:8px"></i>serious <i style="--size:11px"></i>fatal</span></p>
       </div>
-    </div>
+      <button type="button" class="map-options-done" data-act="map-options-close">Done · show map</button>
+      </div>
+    </details>
 
     <aside hidden class="side left" id="left" aria-label="Explore and link settings">
+      <div class="mobile-panel-heading"><h2>Filters &amp; links</h2><button type="button" class="iconbtn" data-act="close-filters">Done</button></div>
       <section>
         <div class="label-row"><p class="label">Search scope</p><button type="button" class="linkbtn" id="f-clear" hidden>Clear</button></div>
         <div class="filters">
@@ -404,6 +410,7 @@ details.narr .narr-text { margin-top: 8px; font-size: var(--fs-sm); line-height:
 
 <dialog id="map-guide" class="map-guide" aria-labelledby="map-guide-title">
   <header><h2 id="map-guide-title">Reading the map &amp; links</h2><form method="dialog"><button class="iconbtn" aria-label="Close map guide" autofocus>Close</button></form></header>
+  <p><button type="button" class="btn" id="restart-tutorial" disabled>Start guided search tutorial</button></p>
   <h3>One dot, one report</h3>
   <p>Each dot is an ASRS report or NTSB investigation. Colours follow the selected Colour key. Several reports can describe the same incident.</p>
   <h3>Position means similarity of narrative text</h3>
@@ -422,10 +429,12 @@ details.narr .narr-text { margin-top: 8px; font-size: var(--fs-sm); line-height:
 <script src="semantic-search.js"></script>
 <script src="source-links.js"></script>
 <script src="analytics.js"></script>
+<script src="onboarding.js?v=2"></script>
 <script>
 (async function () {
   "use strict";
   const $ = (s, el = document) => el.querySelector(s);
+  let tutorial = null;
   // Keep the guide usable while data loads; native dialog handles focus and Escape.
   const mapGuide = $("#map-guide");
   $("#map-info").addEventListener("click", () => mapGuide.showModal());
@@ -439,6 +448,9 @@ details.narr .narr-text { margin-top: 8px; font-size: var(--fs-sm); line-height:
   const reEsc = s => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
   const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
   const mobileLayout = window.matchMedia("(max-width: 760px), (max-width: 1100px) and (max-height: 500px)");
+  // Mobile settings are opt-in; never cover the map while the collection is loading.
+  const mapOptions = $("#mapkey");
+  mapOptions.open = !mobileLayout.matches;
   // The visual viewport shrinks above the software keyboard on mobile browsers.
   function syncViewport() {
     const v = window.visualViewport;
@@ -684,9 +696,12 @@ details.narr .narr-text { margin-top: 8px; font-size: var(--fs-sm); line-height:
   function resize() {
     if (analyticsOpen) return;
     const b = cv.getBoundingClientRect();
+    const widthChanged = W > 1 && Math.abs(W - b.width) > 1;
     W = Math.max(1, b.width); H = Math.max(1, b.height);
     DPR = Math.min(2, window.devicePixelRatio || 1);
     cv.width = Math.round(W * DPR); cv.height = Math.round(H * DPR);
+    // A rotation changes width; refit then, while keeping the camera through keyboard resizes.
+    if (widthChanged && mobileLayout.matches && scenes[state.view].t) fitScene(false);
     requestDraw();
   }
   const zoom = d3.zoom().scaleExtent([0.2, 16]).on("zoom", e => { T = e.transform; scenes[state.view].t = T; hideTip(); requestDraw(); });
@@ -733,6 +748,7 @@ details.narr .narr-text { margin-top: 8px; font-size: var(--fs-sm); line-height:
       if (narrow) y1 = ib.top - b.top - 12; else x1 = ib.left - b.left - 16;
     }
     if (!$("#trail").hidden) y0 = 52;
+    else if (narrow && state.view === "map" && window.innerWidth < 600) y0 = 64;
     if (x1 - x0 < 120) { x0 = 16; x1 = W - 16; }
     if (y1 - y0 < 120) { y0 = 16; y1 = H - 16; }
     return { x0, x1, y0, y1 };
@@ -858,6 +874,7 @@ details.narr .narr-text { margin-top: 8px; font-size: var(--fs-sm); line-height:
       colorSets = { groups, other, order: groups.map((_, g) => g).sort((a, b) => groups[b].length - groups[a].length) };
     }
     $("#color-by").value = state.colorBy;
+    $("#map-options-value").textContent = m.label;
     const item = (c, label, n) => `<div><i style="--c:${c}"></i><span>${esc(label)}</span><span>${n.toLocaleString()}</span></div>`;
     $("#keyitems").innerHTML = colorSets
       ? m.groups.map((g, k) => item(g.c, g.label, colorSets.groups[k].length)).join("") + (colorSets.other.length ? item(KEY_OTHER, m.other, colorSets.other.length) : "")
@@ -1137,6 +1154,7 @@ details.narr .narr-text { margin-top: 8px; font-size: var(--fs-sm); line-height:
   });
   cv.addEventListener("pointerleave", () => { state.hover = null; hideTip(); requestDraw(); });
   cv.addEventListener("click", e => {
+    if (mobileLayout.matches && mapOptions.open) { mapOptions.open = false; return; }
     const h = hit(...local(e));
     if (!h) { if (state.sel && !(state.view === "focus" && state.sel.kind === "report" && state.sel.id === state.focus)) clearSel(); return; }
     if (h.kind === "report") selectReport(h.id, { pan: false }); else selectFactor(h.id);
@@ -1150,18 +1168,22 @@ details.narr .narr-text { margin-top: 8px; font-size: var(--fs-sm); line-height:
   function setHash(h) { try { history.replaceState(null, "", h ? "#" + h : location.pathname + location.search); } catch (e) {} }
   function selectReport(i, { pan = true } = {}) {
     state.compare = null;
-    if (mobileLayout.matches) setLeft(false);
+    if (mobileLayout.matches) { setLeft(false); mapOptions.open = false; }
     state.sel = { kind: "report", id: i }; state.listLimit = 30;
+    if (mobileLayout.matches) setSheet("");
+    renderInspector();
     if (state.view === "map") {
       setHash(`report=${encodeURIComponent(U.identity(R[i]))}`);
       if (pan) fitTo(mapPts([i, ...related(i, 12).map(c => c.j)]), { maxK: 4.5, pad: 0.7 });
     }
-    renderInspector(); requestDraw(); renderHud();
+    requestDraw(); renderHud();
+    tutorial?.reportSelected();
   }
   function selectFactor(f) {
     state.compare = null;
-    if (mobileLayout.matches) setLeft(false);
+    if (mobileLayout.matches) { setLeft(false); mapOptions.open = false; }
     state.sel = { kind: "factor", id: f }; state.listLimit = 30;
+    if (mobileLayout.matches) setSheet("");
     renderInspector(); requestDraw(); renderHud();
   }
   function clearSel() {
@@ -1171,7 +1193,7 @@ details.narr .narr-text { margin-top: 8px; font-size: var(--fs-sm); line-height:
     renderInspector(); requestDraw(); renderHud();
   }
   function openFocus(i, { fromTrail = false } = {}) {
-    if (mobileLayout.matches) setLeft(false);
+    if (mobileLayout.matches) { setLeft(false); mapOptions.open = false; }
     closeAnalytics();
     state.compare = null;
     if (fromTrail) state.trail = state.trail.slice(0, state.trail.indexOf(i) + 1);
@@ -1180,12 +1202,15 @@ details.narr .narr-text { margin-top: 8px; font-size: var(--fs-sm); line-height:
     state.focus = i; state.sel = { kind: "report", id: i }; state.view = "focus"; state.listLimit = 30;
     renderTrail();
     buildFocus(i);
+    renderInspector();
+    if (mobileLayout.matches) setSheet("peek");
     fitScene(already);
     setHash(`focus=${encodeURIComponent(U.identity(R[i]))}`);
-    renderInspector(); renderHud(); requestDraw();
+    renderHud(); requestDraw();
   }
   function setView(v) {
     closeAnalytics();
+    if (mobileLayout.matches) { setLeft(false); mapOptions.open = false; setSheet("peek"); }
     state.compare = null;
     if (v === state.view) return;
     if (v === "focus") {
@@ -1200,7 +1225,9 @@ details.narr .narr-text { margin-top: 8px; font-size: var(--fs-sm); line-height:
     const t = scenes[v].t;
     if (t) d3.select(cv).call(zoom.transform, t); else fitScene(false);
     setHash(v === "focus" ? `focus=${encodeURIComponent(U.identity(R[state.focus]))}` : state.sel?.kind === "report" ? `report=${encodeURIComponent(U.identity(R[state.sel.id]))}` : "");
-    hideTip(); renderInspector(); renderHud(); requestDraw();
+    hideTip(); renderInspector();
+    if (mobileLayout.matches) setSheet("peek");
+    renderHud(); requestDraw();
   }
   function addChip(c) {
     state.compare = null;
@@ -1267,7 +1294,7 @@ details.narr .narr-text { margin-top: 8px; font-size: var(--fs-sm); line-height:
   }
   const factorItem = (f, toks = []) => ({ act: () => addChip({ kind: "factor", id: f }),
     html: `<span class="ic sq" style="--c:${COL[F[f].layer]}"></span><span class="main"><span class="t">${hiText(F[f].label, toks)}${F[f].src === "llm" ? ' <span class="ai">AI</span>' : ""}</span><span class="s">${esc(TI[F[f].layer].label)} · add as a filter</span></span><span class="n">${F[f].df}</span>` });
-  const reportItem = (i, toks = [], similarity = null) => ({ act: () => { closePalette(); q.blur(); selectReport(i); },
+  const reportItem = (i, toks = [], similarity = null) => ({ report: i, act: () => { closePalette(); q.blur(); selectReport(i); },
     html: `<span class="ic ring"></span><span class="main"><span class="t mono">${esc(idLabel(R[i]))} · ${esc(dateLabel(R[i]))} · ${esc(R[i].aircraft)}</span><span class="s">${hiText(snippet(R[i].summary || R[i].synopsis, toks), toks)}</span></span><span class="n" title="Cosine similarity of summary embeddings; not a probability">${similarity === null ? "" : similarity.toFixed(3)}</span>` });
   const regionItem = (c, toks = []) => ({ act: () => { if (state.view !== "map") setView("map"); addChip({ kind: "region", id: c.id }); },
     html: `<span class="ic dia" style="--c:${INK2}"></span><span class="main"><span class="t">${hiText(c.label, toks)}</span><span class="s">Region on the map</span></span><span class="n">${c.n}</span>` });
@@ -1281,12 +1308,12 @@ details.narr .narr-text { margin-top: 8px; font-size: var(--fs-sm); line-height:
         semantic.search(text, matchSet ? [...matchSet] : null).then(rows => {
           if (rows === null || semanticState !== current) return;
           current.pending = false; current.rows = rows;
-          if (!pal.hidden && document.activeElement === q && q.value.trim() === text) runSearch();
+          if (!pal.hidden && (document.activeElement === q || tutorial?.keepPalette()) && q.value.trim() === text) runSearch();
         }).catch(error => {
           if (semanticState !== current) return;
           current.pending = false; current.error = error.message;
           console.warn("Meaning search:", error.message);
-          if (!pal.hidden && document.activeElement === q) runSearch();
+          if (!pal.hidden && (document.activeElement === q || tutorial?.keepPalette())) runSearch();
         });
       }
     } else { semantic.cancel(); semanticState = null; }
@@ -1332,7 +1359,7 @@ details.narr .narr-text { margin-top: 8px; font-size: var(--fs-sm); line-height:
     palItems = sections.flatMap(s => s.items);
     palIdx = 0;
     let k = 0;
-    pal.innerHTML = sections.map(s => `${s.h ? `<div class="pal-h"><span class="label">${esc(s.h)}</span>${s.n ? `<span class="label">${esc(s.n)}</span>` : ""}</div>` : ""}${s.empty ? `<p class="hint" style="padding:4px 8px 10px">${s.empty}</p>` : ""}${s.status ? `<p class="semantic-status" role="status">${esc(s.status)}</p>` : ""}${s.items.map(it => `<button type="button" class="pal-item" role="option" data-k="${k++}" aria-selected="false">${it.html}</button>`).join("")}`).join("")
+    pal.innerHTML = sections.map(s => `${s.h ? `<div class="pal-h"><span class="label">${esc(s.h)}</span>${s.n ? `<span class="label">${esc(s.n)}</span>` : ""}</div>` : ""}${s.empty ? `<p class="hint" style="padding:4px 8px 10px">${s.empty}</p>` : ""}${s.status ? `<p class="semantic-status" role="status">${esc(s.status)}</p>` : ""}${s.items.map(it => `<button type="button" class="pal-item" role="option" ${it.report != null ? `data-report="${it.report}"` : ""} data-k="${k++}" aria-selected="false">${it.html}</button>`).join("")}`).join("")
       + `<div class="pal-foot"><span><kbd>↑</kbd> <kbd>↓</kbd> move</span><span><kbd>↵</kbd> open</span><span><kbd>esc</kbd> close</span><span><kbd>⌫</kbd> remove last filter</span></div>`;
     pal.querySelectorAll(".pal-item").forEach(b => {
       b.addEventListener("mousedown", e => e.preventDefault());
@@ -1347,10 +1374,10 @@ details.narr .narr-text { margin-top: 8px; font-size: var(--fs-sm); line-height:
     pal.querySelectorAll(".pal-item").forEach(b => b.setAttribute("aria-selected", String(+b.dataset.k === palIdx)));
     pal.querySelector(`.pal-item[data-k="${palIdx}"]`)?.scrollIntoView({ block: "nearest" });
   }
-  function closePalette() { semantic.cancel(); if (semanticState?.pending) semanticState = null; pal.hidden = true; q.setAttribute("aria-expanded", "false"); }
+  function closePalette() { clearTimeout(timer); semantic.cancel(); if (semanticState?.pending) semanticState = null; pal.hidden = true; q.setAttribute("aria-expanded", "false"); }
   q.addEventListener("input", () => { semantic.cancel(); semanticState = null; clearTimeout(timer); timer = setTimeout(runSearch, meaningMode ? 300 : 80); });
   q.addEventListener("focus", runSearch);
-  q.addEventListener("blur", () => setTimeout(() => { if (document.activeElement !== q) { closePalette(); if (state.preview) { state.preview = null; requestDraw(); renderHud(); } } }, 120));
+  q.addEventListener("blur", () => setTimeout(() => { if (document.activeElement !== q && !tutorial?.keepPalette()) { closePalette(); if (state.preview) { state.preview = null; requestDraw(); renderHud(); } } }, 120));
   q.addEventListener("keydown", e => {
     if (e.key === "ArrowDown" && palItems.length) { e.preventDefault(); palIdx = (palIdx + 1) % palItems.length; markPal(); }
     else if (e.key === "ArrowUp" && palItems.length) { e.preventDefault(); palIdx = (palIdx - 1 + palItems.length) % palItems.length; markPal(); }
@@ -1366,7 +1393,8 @@ details.narr .narr-text { margin-top: 8px; font-size: var(--fs-sm); line-height:
   });
   function renderChips() {
     $("#chips").innerHTML = state.chips.map((c, k) => `<span class="chip ${c.kind}" style="--c:${chipColor(c)}"><span class="dot"></span><span class="txt">${esc(chipLabel(c))}</span><button type="button" data-act="rm-chip" data-k="${k}" aria-label="Remove filter ${esc(chipLabel(c))}">×</button></span>`).join("");
-    q.placeholder = state.chips.length ? "Add another filter…" : "Describe a safety issue, or enter a case number…";
+    q.placeholder = state.chips.length ? "Add another filter…"
+      : mobileLayout.matches ? "Search incidents…" : "Describe a safety issue, or enter a case number…";
     syncFilters();
   }
 
@@ -1604,13 +1632,16 @@ details.narr .narr-text { margin-top: 8px; font-size: var(--fs-sm); line-height:
     stage.classList.toggle("sheet-peek", mode === "peek");
     stage.classList.toggle("sheet-expanded", mode === "expanded");
     const handle = $(".sheet-handle"), expand = $(".sheet-expand");
-    if ($("#inspector-content")) $("#inspector-content").inert = mode === "peek";
+    if ($("#inspector-content")) $("#inspector-content").inert = mobileLayout.matches && mode === "peek";
     if (handle) {
-      handle.textContent = mode === "peek" ? "Show details" : "Minimise details";
+      const title = state.compare ? "Report comparison" : state.sel?.kind === "report"
+        ? idLabel(R[state.sel.id]) : state.sel?.kind === "factor" ? F[state.sel.id].label
+        : matchSet ? `${matchSet.size.toLocaleString()} matching reports` : "Getting started";
+      handle.textContent = mode === "peek" ? title : "Show map";
       handle.setAttribute("aria-expanded", String(mode !== "peek"));
     }
     if (expand) {
-      expand.textContent = mode === "expanded" ? "Restore" : "Expand";
+      expand.textContent = mode === "peek" ? "Open" : mode === "expanded" ? "Split view" : "Full screen";
       expand.setAttribute("aria-pressed", String(mode === "expanded"));
     }
   }
@@ -1625,7 +1656,10 @@ details.narr .narr-text { margin-top: 8px; font-size: var(--fs-sm); line-height:
     else html = viewWelcome();
     const key = state.compare ? `compare:${state.compare.join(":")}`
       : state.sel ? `${state.sel.kind}:${state.sel.id}` : matchSet ? "matches" : "welcome";
-    if (key !== inspectorKey) { setSheet(""); inspectorKey = key; }
+    if (key !== inspectorKey) {
+      setSheet(mobileLayout.matches && key === "welcome" ? "peek" : "");
+      inspectorKey = key;
+    }
     el.innerHTML = `<div class="sheet-tools"><button type="button" class="sheet-handle" data-act="sheet" aria-expanded="true" aria-controls="inspector-content">Minimise details</button><button type="button" class="sheet-expand" data-act="sheet-expand" aria-pressed="false">Expand</button></div><div id="inspector-content" style="display:contents">${html}</div>`;
     setSheet(stage.classList.contains("sheet-peek") ? "peek"
       : stage.classList.contains("sheet-expanded") ? "expanded" : "");
@@ -1637,7 +1671,9 @@ details.narr .narr-text { margin-top: 8px; font-size: var(--fs-sm); line-height:
     const el = e.target.closest("[data-act]");
     if (!el) return;
     const a = el.dataset.act, n = k => +el.dataset[k];
-    if (a === "scope") { setFilter("src", {kind: "src", ids: SOURCES.filter(x => el.dataset.source === "ntsb" ? x.id === 1 : x.id !== 1).map(x => x.id)}); }
+    if (a === "map-options-close") { mapOptions.open = false; $(".map-options-toggle").focus(); }
+    else if (a === "close-filters") { setLeft(false); $("#t-left").focus(); }
+    else if (a === "scope") { setFilter("src", {kind: "src", ids: SOURCES.filter(x => el.dataset.source === "ntsb" ? x.id === 1 : x.id !== 1).map(x => x.id)}); }
     else if (a === "compare") { state.compare = [n("from"), n("i")]; setLeft(false); renderInspector(); requestDraw(); }
     else if (a === "report") selectReport(n("i"));
     else if (a === "focus") openFocus(n("i"));
@@ -1734,6 +1770,7 @@ details.narr .narr-text { margin-top: 8px; font-size: var(--fs-sm); line-height:
     updateViews();
   }
   function openAnalytics() {
+    if (mobileLayout.matches) { setLeft(false); mapOptions.open = false; setSheet("peek"); }
     d3.select(cv).interrupt();
     analyticsOpen = true;
     focus.sim?.stop();
@@ -1759,7 +1796,20 @@ details.narr .narr-text { margin-top: 8px; font-size: var(--fs-sm); line-height:
     $("#t-left").setAttribute("aria-pressed", String(open));
     $("#t-left").setAttribute("aria-expanded", String(open));
     stage.classList.toggle("no-left", !open);
+    $("#t-left").textContent = mobileLayout.matches ? "Filters" : "Explore";
+    if (open && mobileLayout.matches) { mapOptions.open = false; setSheet("peek"); closePalette(); }
   }
+  mapOptions.addEventListener("toggle", () => {
+    if (mapOptions.open && mobileLayout.matches) { setLeft(false); setSheet("peek"); }
+  });
+  // Escape dismisses the foremost mobile panel without clearing a selected report.
+  document.addEventListener("keydown", e => {
+    if (e.key !== "Escape" || !mobileLayout.matches || document.body.classList.contains("tutorial-running") || document.querySelector("dialog[open]")) return;
+    if (mapOptions.open) { mapOptions.open = false; $(".map-options-toggle").focus(); }
+    else if (!$("#left").hidden) { setLeft(false); $("#t-left").focus(); }
+    else return;
+    e.preventDefault(); e.stopImmediatePropagation();
+  }, true);
   $("#t-left").onclick = () => setLeft($("#left").hidden);
   $("#z-in").onclick = () => d3.select(cv).transition().duration(reduceMotion ? 0 : 250).call(zoom.scaleBy, 1.35);
   $("#z-out").onclick = () => d3.select(cv).transition().duration(reduceMotion ? 0 : 250).call(zoom.scaleBy, 1 / 1.35);
@@ -1773,7 +1823,12 @@ details.narr .narr-text { margin-top: 8px; font-size: var(--fs-sm); line-height:
   // ------------------------------------------------------------------ boot
   $("#brand-sub").textContent = `${N.toLocaleString()} reports · ASRS + NTSB`;
   setLeft(window.innerWidth > 1100);
-  mobileLayout.addEventListener("change", () => { setLeft(false); setSheet(""); hideTip(); });
+  mobileLayout.addEventListener("change", () => {
+    mapOptions.open = !mobileLayout.matches;
+    setLeft(false);
+    setSheet(mobileLayout.matches ? "peek" : "");
+    renderChips(); hideTip(); fitScene(false);
+  });
   buildLeft(); buildFilters(); renderChips();
   $("#color-by").innerHTML = Object.entries(COLOR_MODES).map(([k, m]) => `<option value="${k}">${esc(m.label)}</option>`).join("");
   $("#color-by").onchange = e => setColorBy(e.target.value);
@@ -1801,6 +1856,37 @@ details.narr .narr-text { margin-top: 8px; font-size: var(--fs-sm); line-height:
   }
   restoreLocation();
   window.addEventListener("hashchange", restoreLocation);
+  tutorial = SearchTutorial.mount({
+    mobile: mobileLayout,
+    closePalette,
+    search: runSearch,
+    prepare() {
+      // Keep an existing query, filters and deep-linked report when replaying the guide.
+      if (analyticsOpen) closeAnalytics();
+      mapOptions.open = !mobileLayout.matches;
+      setLeft(false);
+    },
+    keywords() { if (meaningMode) searchMode.click(); },
+    inspect() { setSheet("expanded"); },
+    peek() { setSheet("peek"); },
+    map() {
+      setView("map");
+      setSheet("peek");
+      fitScene(false);
+    },
+    focus() {
+      setSheet("peek");
+      if (state.sel?.kind === "report") openFocus(state.sel.id);
+    },
+    diagramBounds() {
+      const a = openArea(), b = cv.getBoundingClientRect();
+      // Spotlight the centre of the diagram while leaving room for its explanation.
+      const height = Math.min(270, (a.y1 - a.y0) * 0.65);
+      const top = b.top + (a.y0 + a.y1 - height) / 2
+        + Math.min(40, (a.y1 - a.y0 - height) / 2);
+      return {left: b.left + a.x0, right: b.left + a.x1, top, bottom: top + height};
+    }
+  });
   if (document.fonts && document.fonts.ready) document.fonts.ready.then(requestDraw);
 })();
 </script>
