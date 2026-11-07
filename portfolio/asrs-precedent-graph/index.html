@@ -3,11 +3,11 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta name="description" content="Search all 47,723 NASA ASRS safety reports and see which ones resemble each other, linked through shared analyst codes, factors coded by a local language model, and narrative similarity.">
-<meta property="og:title" content="ASRS Precedent Graph">
-<meta property="og:description" content="Search all 47,723 NASA ASRS safety reports and see which ones resemble each other, linked through shared analyst codes, factors coded by a local language model, and narrative similarity.">
+<meta name="description" content="Search NASA ASRS reports and NTSB investigations together. Compare narrative summaries, trace shared factors and explore related reports across both sources.">
+<meta property="og:title" content="Aviation Precedent Explorer · ASRS + NTSB">
+<meta property="og:description" content="Search NASA ASRS reports and NTSB investigations together. Compare narrative summaries, trace shared factors and explore related reports across both sources.">
 <meta property="og:type" content="website">
-<title>ASRS Precedent Graph</title>
+<title>Aviation Precedent Explorer</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Semi+Condensed:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500&family=Public+Sans:wght@400;500;600;700&display=swap">
@@ -46,7 +46,7 @@ button, input { font: inherit; color: inherit; }
 .label { margin: 0; font: 600 var(--fs-xs)/1.2 var(--font-display); text-transform: uppercase; letter-spacing: 0.09em; color: var(--muted); }
 .hint { margin: 0; font-size: var(--fs-sm); color: var(--muted); }
 
-.app { position: fixed; inset: env(safe-area-inset-top, 0px) 0 env(safe-area-inset-bottom, 0px) 0; display: grid; grid-template-rows: auto minmax(0, 1fr); }
+.app { position: fixed; top: calc(env(safe-area-inset-top, 0px) + var(--viewport-top, 0px)); left: env(safe-area-inset-left, 0px); right: env(safe-area-inset-right, 0px); height: calc(var(--viewport-height, 100dvh) - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px)); display: grid; grid-template-rows: auto minmax(0, 1fr); }
 
 /* Top bar */
 .topbar { position: relative; z-index: 40; display: flex; align-items: center; gap: 10px 16px; padding-inline: 16px; padding-block: 10px; background: var(--bar); border-bottom: 1px solid var(--line); }
@@ -71,7 +71,7 @@ kbd { font: 500 11px/1.4 var(--font-mono); color: var(--muted); border: 1px soli
 .chip button { border: 0; background: none; padding: 0 4px; cursor: pointer; color: var(--muted); font-size: 15px; line-height: 1; }
 .chip button:hover { color: var(--ink); }
 
-.palette { position: absolute; left: 0; right: 0; top: calc(100% + 6px); z-index: 60; padding: 6px; background: #14181d; border: 1px solid var(--line); border-radius: 12px; box-shadow: 0 22px 60px rgb(0 0 0 / 0.6); max-height: min(72vh, 600px); overflow: auto; }
+.palette { position: absolute; left: 0; right: 0; top: calc(100% + 6px); z-index: 60; padding: 6px; background: #14181d; border: 1px solid var(--line); border-radius: 12px; box-shadow: 0 22px 60px rgb(0 0 0 / 0.6); box-sizing: border-box; max-height: min(600px, calc(var(--viewport-height, 100dvh) - var(--topbar-height, 120px) - 16px)); overflow: auto; overscroll-behavior: contain; }
 .pal-h { display: flex; justify-content: space-between; gap: 8px; padding: 10px 8px 4px; }
 .pal-item { display: grid; grid-template-columns: 16px minmax(0, 1fr) auto; align-items: start; gap: 0 10px; width: 100%; padding: 7px 8px; border: 0; border-radius: 7px; background: none; text-align: left; cursor: pointer; }
 .pal-item[aria-selected="true"] { background: var(--hover); }
@@ -122,7 +122,7 @@ mark { background: none; color: var(--lit); font-weight: 600; }
 .setrow output { text-align: right; }
 .check { display: flex; align-items: center; gap: 8px; font-size: var(--fs-sm); cursor: pointer; }
 .check input { accent-color: var(--ink-2); }
-/* Date, time and place filters: each one also shows as a chip in the search bar. */
+/* Search scope filters: each one also shows as a chip in the search bar. */
 .filters { display: flex; flex-direction: column; gap: 8px; }
 .frow { display: grid; grid-template-columns: 52px minmax(0, 1fr); align-items: center; gap: 6px 8px; font-size: var(--fs-sm); color: var(--ink-2); }
 .frow .pair { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); align-items: center; gap: 6px; }
@@ -142,7 +142,7 @@ mark { background: none; color: var(--lit); font-weight: 600; }
 .keyitems div { display: grid; grid-template-columns: 10px minmax(0, 1fr) auto; align-items: center; gap: 7px; font-size: var(--fs-xs); line-height: 1.35; color: var(--ink-2); }
 .keyitems i { width: 9px; height: 9px; border-radius: 50%; background: var(--c); }
 .keyitems span:last-child { font-family: var(--font-mono); color: var(--muted); }
-@media (max-width: 760px) {
+@media (max-width: 760px), (max-width: 1100px) and (max-height: 500px) {
   .mapkey { width: auto; max-width: calc(100% - 24px); top: 8px; left: 12px; padding: 6px 8px; gap: 4px; }
   .keyitems { flex-direction: row; flex-wrap: wrap; gap: 1px 10px; }
   .keyitems div { grid-template-columns: 9px auto; gap: 5px; font-size: 11px; }
@@ -206,6 +206,8 @@ ol.events { margin: 0; padding-left: 1.4em; display: flex; flex-direction: colum
 .row { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 2px 10px; width: 100%; padding: 8px 6px; border: 0; border-top: 1px solid var(--line-soft); background: none; text-align: left; cursor: pointer; color: var(--ink); }
 .row:hover { background: var(--hover); }
 .row .acn { font: 500 var(--fs-xs)/1.5 var(--font-mono); color: var(--ink-2); }
+.row .acn::before { content: "ASRS "; color: #6ba9ed; }
+.row .acn.ntsb::before { content: "NTSB "; color: #e8ab68; }
 .row .rt { font-size: var(--fs-sm); line-height: 1.35; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
 .row .rm { grid-column: 2; font-size: var(--fs-xs); color: var(--muted); }
 .row .bar { grid-column: 2; margin-top: 4px; }
@@ -221,29 +223,60 @@ details.narr .narr-text { margin-top: 8px; font-size: var(--fs-sm); line-height:
 .qbtns { display: flex; flex-wrap: wrap; gap: 6px; }
 .qbtns button { border: 1px solid var(--line); background: var(--raised); border-radius: 6px; padding: 3px 9px; cursor: pointer; font: 400 var(--fs-xs)/1.5 var(--font-mono); color: var(--ink-2); }
 .qbtns button:hover { color: var(--ink); border-color: var(--ink-2); }
-.sheet-handle { display: none; }
+.sheet-tools { display: none; }
 
 @media (max-width: 1100px) {
   .stage { --lw: 0px; --rw: 360px; }
   .side.left { z-index: 35; box-shadow: 0 20px 60px rgb(0 0 0 / 0.6); }
   .side.right { width: 348px; }
 }
-@media (max-width: 760px) {
+@media (max-width: 760px), (max-width: 1100px) and (max-height: 500px) {
   .topbar { flex-wrap: wrap; padding-block: 8px; }
   .brand small { display: none; }
   .omni-wrap { order: 3; flex-basis: 100%; }
   .stage { --rw: 0px; }
   .side.left { left: 8px; right: 8px; width: auto; }
   .side.right { left: 8px; right: 8px; top: auto; width: auto; height: 44%; bottom: 8px; padding-top: 6px; }
-  .side.right.peek { height: 54px; overflow: hidden; }
-  .sheet-handle { display: block; align-self: center; width: 44px; height: 18px; border: 0; background: none; cursor: pointer; flex: none; }
-  .sheet-handle::before { content: ""; display: block; width: 36px; height: 4px; margin: 0 auto; border-radius: 2px; background: var(--line); }
+
   .hud { display: none; }
   .zoombox { bottom: calc(44% + 18px); right: 12px; }
   .trail { right: 12px; }
   .seq-pair { grid-template-columns: 1fr; }
 }
+
+/* Source identity and cross-source evidence are the primary navigation cues. */
+#f-src { display: grid; grid-template-columns: 1fr 1fr 1fr; width: 100%; }
+#f-src button { min-height: 52px; display: flex; flex-direction: column; align-items: start; gap: 4px; padding: 7px; }
+#f-src button b { font: 500 11px var(--font-mono); }
+#f-src button[data-src="asrs"] { color: #8bbded; }
+#f-src button[data-src="ntsb"] { color: #e8ab68; }
+#f-src button:disabled { opacity: .4; cursor: default; }
+.source-overview { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.source-card { border: 0; text-align: left; color: var(--ink); cursor: pointer; border-top: 2px solid #6ba9ed; background: var(--raised); padding: 12px; }
+.source-card:hover { background: var(--hover); }
+.source-card:disabled { opacity: .5; cursor: default; }
+.source-card.ntsb { border-color: #e8ab68; }
+.source-card b { display: block; font: 600 1.5rem var(--font-display); }
+.source-card small { display: block; color: var(--muted); font-size: 11px; }
+.ai-summary { padding: 12px; background: var(--raised); border-left: 2px solid #9aa5b7; }
+.cross-section { border-top: 2px solid #e8ab68; padding-top: 12px; }
+.cross-row { display: grid; grid-template-columns: 1fr auto; gap: 5px; padding-block: 10px; border-bottom: 1px solid var(--line); }
+.cross-row p { grid-column: 1/-1; margin: 0; font-size: var(--fs-sm); color: var(--ink-2); }
+.cross-row small { grid-column: 1/-1; color: var(--muted); font-size: 11px; }
+.cross-row .linkbtn { color: #e8ab68; }
+.stage.comparing { --rw: 720px; }
+.stage.comparing .side.right { width: min(696px, calc(100% - 24px)); }
+.comparison-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.compare-card { min-width: 0; border: 1px solid var(--line); border-top: 2px solid #6ba9ed; padding: 12px; }
+.compare-card.ntsb { border-top-color: #e8ab68; }
+.compare-card p { font-size: var(--fs-sm); }
+.brand h1 { white-space: normal; }
+.brand small { font-size: 10px; }
+@media (max-width: 760px), (max-width: 1100px) and (max-height: 500px) { .topbar > a.iconbtn { display: none; } .brand svg { display: none; } .topbar { padding-inline: 10px; } .views button { padding-inline: 9px; } .stage.comparing { --rw: 0px; } .comparison-grid { grid-template-columns: 1fr; } .stage.comparing .side.right { height: 72%; width: auto; } .topbar { gap: 8px; } .brand { flex: 1; } .brand h1 { font-size: 1rem; } }
+
 </style>
+<link rel="stylesheet" href="analytics.css">
+<link rel="stylesheet" href="mobile.css">
 </head>
 <body>
 <div class="app">
@@ -251,13 +284,13 @@ details.narr .narr-text { margin-top: 8px; font-size: var(--fs-sm); line-height:
     <a class="iconbtn" href="/" style="text-decoration:none" aria-label="Back to the Triaggent homepage">&larr; Triaggent</a>
     <div class="brand">
       <svg width="24" height="24" viewBox="0 0 24 24" aria-hidden="true"><g fill="none" stroke="#b4bcc5" stroke-width="1.3"><path d="M5 17 12 6l7 11M5 17h14M12 6v11"/></g><circle cx="12" cy="6" r="2.6" fill="#e9ecf0"/><rect x="2.6" y="14.6" width="4.8" height="4.8" rx="1" fill="#3987e5"/><rect x="16.6" y="14.6" width="4.8" height="4.8" rx="1" fill="#d95926"/><circle cx="12" cy="17" r="1.8" fill="#199e70"/></svg>
-      <div><h1>ASRS Precedent Graph</h1><small id="brand-sub">NASA ASRS · all flight phases</small></div>
+      <div><h1>Aviation Precedent Explorer</h1><small id="brand-sub">ASRS + NTSB · unified report search</small></div>
     </div>
     <div class="omni-wrap">
       <div class="omni" id="omni">
         <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><circle cx="7" cy="7" r="4.6" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="m10.5 10.5 3.2 3.2" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
         <div class="chips" id="chips"></div>
-        <input id="q" type="search" autocomplete="off" spellcheck="false" placeholder="Search reports, factors, aircraft, airports…" aria-label="Search reports and factors" aria-controls="palette" aria-expanded="false" aria-autocomplete="list">
+        <input id="q" type="search" autocomplete="off" spellcheck="false" placeholder="Search ASRS + NTSB: engine failure, case number, airport…" aria-label="Search reports and factors" aria-controls="palette" aria-expanded="false" aria-autocomplete="list">
         <kbd title="Press / or Ctrl+K to search">/</kbd>
       </div>
       <div class="palette" id="palette" role="listbox" aria-label="Search results" hidden></div>
@@ -265,11 +298,13 @@ details.narr .narr-text { margin-top: 8px; font-size: var(--fs-sm); line-height:
     <div class="views" role="group" aria-label="View">
       <button type="button" id="v-map" aria-pressed="true">Map</button>
       <button type="button" id="v-focus" aria-pressed="false" disabled title="Select a report first">Focus</button>
+      <button type="button" id="v-analytics" aria-pressed="false">Analytics</button>
     </div>
     <button type="button" class="iconbtn" id="t-left" aria-pressed="true" aria-controls="left">Explore</button>
   </header>
 
   <div class="stage" id="stage">
+    <main id="analytics" aria-label="Safety analytics" hidden></main>
     <canvas id="cv" aria-label="Graph of safety reports. Use the search box and the inspector lists to navigate with a keyboard."></canvas>
     <nav class="trail" id="trail" aria-label="Reports you have focused" hidden></nav>
     <div class="mapkey" id="mapkey" role="group" aria-label="Map colours">
@@ -277,15 +312,16 @@ details.narr .narr-text { margin-top: 8px; font-size: var(--fs-sm); line-height:
       <div class="keyitems" id="keyitems"></div>
     </div>
 
-    <aside class="side left" id="left" aria-label="Explore and link settings">
+    <aside hidden class="side left" id="left" aria-label="Explore and link settings">
       <section>
-        <div class="label-row"><p class="label">Date, time and place</p><button type="button" class="linkbtn" id="f-clear" hidden>Clear</button></div>
+        <div class="label-row"><p class="label">Search scope</p><button type="button" class="linkbtn" id="f-clear" hidden>Clear</button></div>
         <div class="filters">
+          <div class="frow"><span id="f-src-l">Source</span><div class="tods" id="f-src" role="group" aria-labelledby="f-src-l"></div></div>
           <div class="frow"><span id="f-date-l">Date</span><div class="pair" role="group" aria-labelledby="f-date-l"><select id="f-from" aria-label="From year"></select><span>to</span><select id="f-to" aria-label="To year"></select></div></div>
           <div class="frow"><span id="f-tod-l">Time</span><div class="tods" id="f-tod" role="group" aria-labelledby="f-tod-l"></div></div>
           <div class="frow"><label for="f-state">Place</label><select id="f-state"></select></div>
           <div class="frow"><label for="f-apt">Airport</label><input id="f-apt" list="f-apt-list" autocomplete="off" spellcheck="false" placeholder="Code, e.g. DEN or ZLA"><datalist id="f-apt-list"></datalist></div>
-          <p class="hint" id="f-note">Local time of day. ASRS withholds the airport in most reports, so the airport filter covers only those that name one.</p>
+          <p class="hint" id="f-note">Local time of day. ASRS withholds the airport in most reports, so the airport filter covers only those that name one. * ASRS reports 2021–2025 without analyst codes; their month is estimated from the ACN.</p>
         </div>
       </section>
       <section>
@@ -313,7 +349,7 @@ details.narr .narr-text { margin-top: 8px; font-size: var(--fs-sm); line-height:
       <details class="about"><summary>About the data and the links</summary><div id="about"></div></details>
     </aside>
 
-    <aside class="side right" id="insp" aria-label="Inspector" aria-live="polite"></aside>
+    <aside class="side right" id="insp" aria-label="Inspector" aria-live="polite"><p class="label">Aviation Precedent Explorer</p><h2>Loading the report collection…</h2><p class="hint" id="load-status">Preparing ASRS and NTSB search.</p></aside>
 
     <div class="hud" id="hud"></div>
     <div class="zoombox">
@@ -326,6 +362,8 @@ details.narr .narr-text { margin-top: 8px; font-size: var(--fs-sm); line-height:
 </div>
 
 <script src="vendor/d3.min.js"></script>
+<script src="unified.js"></script>
+<script src="analytics.js"></script>
 <script>
 (async function () {
   "use strict";
@@ -333,6 +371,21 @@ details.narr .narr-text { margin-top: 8px; font-size: var(--fs-sm); line-height:
   const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
   const reEsc = s => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
   const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  const mobileLayout = window.matchMedia("(max-width: 760px), (max-width: 1100px) and (max-height: 500px)");
+  // The visual viewport shrinks above the software keyboard on mobile browsers.
+  function syncViewport() {
+    const v = window.visualViewport;
+    if (v && v.scale !== 1) return;
+    document.documentElement.style.setProperty("--viewport-height", `${v?.height || innerHeight}px`);
+    document.documentElement.style.setProperty("--viewport-top", `${v?.offsetTop || 0}px`);
+  }
+  syncViewport();
+  window.visualViewport?.addEventListener("resize", syncViewport);
+  window.visualViewport?.addEventListener("scroll", syncViewport);
+  window.addEventListener("resize", syncViewport);
+  new ResizeObserver(([entry]) => {
+    document.documentElement.style.setProperty("--topbar-height", `${entry.target.getBoundingClientRect().height}px`);
+  }).observe($(".topbar"));
   const TAU = Math.PI * 2;
 
   // Link types in colour-slot order (validated categorical palette, dark steps).
@@ -359,17 +412,26 @@ details.narr .narr-text { margin-top: 8px; font-size: var(--fs-sm); line-height:
   // ------------------------------------------------------------------ data
   let D;
   try {
-    const res = await fetch("data/graph.json");
+    const res = await fetch("data/graph.json", { cache: "no-cache" });
     if (!res.ok) throw new Error(res.status);
     D = await res.json();
+    // Corpus v2 keeps the reports in shards, each well under GitHub's 100 MB file limit.
+    if (!D.reports) {
+      $("#load-status").textContent = `Loading ${D.meta.n_reports.toLocaleString()} reports from both collections…`;
+      const parts = await Promise.all([...Array(D.meta.n_report_shards).keys()].map(k =>
+        fetch(`data/reports/${k}.json`, { cache: "no-cache" }).then(r => { if (!r.ok) throw new Error(r.status); return r.json(); })));
+      D.reports = parts.flat();
+    }
   } catch (e) {
     $("#insp").innerHTML = `<p>Could not load <code>data/graph.json</code>. Open this page from a web server (for example <code>python3 -m http.server</code> in its folder) and reload.</p>`;
     return;
   }
-  const R = D.reports, F = D.facets, N = R.length, META = D.meta;
+  const U = UnifiedReports;
+  const R = D.reports, F = U.normaliseFactors(D), N = R.length, META = D.meta;
   const post = F.map(() => []);
   R.forEach((r, i) => {
     r.i = i;
+    r.src = r.src || 0;
     r.fs = new Set(r.f);
     r.own = {};
     for (const f of r.f) {
@@ -381,21 +443,22 @@ details.narr .narr-text { margin-top: 8px; font-size: var(--fs-sm); line-height:
     r.seqMap = new Map(r.seq || []);
     r.syn = r.synopsis.toLowerCase();
     r.yr = +r.date.slice(0, 4);
-    r.hay = ` ${r.acn} ${r.aircraft} ${r.loc || ""} ${r.synopsis} ${r.f.map(f => F[f].label).join(" ")} ${(r.events || []).join(" ")}`.toLowerCase();
+    r.hay = ` ${r.acn} ${r.src === 1 ? "ntsb" : "asrs"} ${r.aircraft} ${r.loc || ""} ${r.synopsis} ${r.summary || ""} ${r.id || ""} ${r.f.map(f => F[f].label).join(" ")} ${(r.events || []).join(" ")}`.toLowerCase();
     r.wx = r.xy[0] * WORLD;
     r.wy = r.xy[1] * WORLD;
   });
   F.forEach((f, k) => { f.k = k; f.lc = f.label.toLowerCase(); });
   const byAcn = new Map(R.map((r, i) => [r.acn, i]));
+  const byId = new Map(R.map((r, i) => [U.identity(r), i]));
   const REG = (META.clusters || []).slice().sort((a, b) => b.n - a.n);
   const regById = new Map(REG.map(c => [c.id, c]));
   const regMembers = new Map(REG.map(c => [c.id, []]));
   R.forEach(r => { if (r.cl != null && regMembers.has(r.cl)) regMembers.get(r.cl).push(r.i); });
   // Sharing one factor that ~2% of reports have is enough to max out a link type.
   const IDF_REF = Math.log((N + 1) / (N / 50 + 1));
-  // Date, time and place filters. Unlike factor, region and text chips, these also narrow the
+  // Search scope filters. Unlike factor, region and text chips, these also narrow the
   // related-report lists and the focus graph, so "similar reports, at night, in 2019" works.
-  const FILTER_KINDS = new Set(["date", "tod", "state", "apt"]);
+  const FILTER_KINDS = new Set(["src", "date", "tod", "state", "apt"]);
   const TOD = META.tod || [];
   const TOD_SHORT = ["00–06", "06–12", "12–18", "18–24"];
   const STATE = new Map((META.states || []).map(s => [s.id, s]));
@@ -405,13 +468,20 @@ details.narr .narr-text { margin-top: 8px; font-size: var(--fs-sm); line-height:
   const whenWhere = r => [r.t != null ? `${TOD[r.t]} local` : "", r.loc || "", r.st ? (STATE.get(r.st)?.label || r.st) : ""].filter(Boolean).join(" · ");
   const short = l => l.replace(/^(Component|Location|Aircraft): /, "").replace("Communication breakdown:", "Comms breakdown:");
   const clip = (s, n) => s.length > n ? s.slice(0, n - 1) + "…" : s;
+  // Sources: 0 = ASRS with analyst codes, 1 = NTSB, 2 = ASRS narrative only (date estimated).
+  const SOURCES = META.sources || [{ id: 0, label: "ASRS" }];
+  const idLabel = r => r.src === 1 ? `NTSB ${r.acn}` : `ASRS ${r.acn}`;
+  const dateLabel = r => (r.de ? "≈" : "") + r.date;
+  const SYN_LABEL = ["ASRS analyst synopsis", "NTSB probable cause", "Summary · Qwen3.5-27B (local LLM)"];
+  const NARR_LABEL = ["Read the reporter's narrative", "Read the NTSB factual narrative", "Read the reporter's narrative"];
 
   const state = {
     view: "map", chips: [], preview: null, sel: null, hover: null, focus: null, trail: [],
     w: Object.fromEntries(TYPES.map(t => [t.id, STEPS[t.def]])), wver: 0,
-    nRel: 16, nHubs: 12, textLinks: true, listLimit: 30, colorBy: "phase",
+    nRel: 16, nHubs: 12, textLinks: true, listLimit: 30, colorBy: "source", compare: null,
   };
 
+  let analyticsOpen = false, analyticsMounted = false;
   // ------------------------------------------------------------------ link scoring
   function score(s, required = []) {
     const S = R[s], W = state.w;
@@ -476,7 +546,7 @@ details.narr .narr-text { margin-top: 8px; font-size: var(--fs-sm); line-height:
     q = q.trim();
     if (textCache.has(q)) return textCache.get(q);
     const out = [];
-    if (/^\d{3,}$/.test(q)) { for (const r of R) if (r.acn.startsWith(q)) out.push(r.i); }
+    if (/^\d{3,}$/.test(q) || /^[a-z]{3}\d{2}[a-z]{0,2}\d*$/i.test(q)) { const Q = q.toUpperCase(); for (const r of R) if (r.acn.toUpperCase().startsWith(Q)) out.push(r.i); }
     else { const res = tokens(q).map(wordRe); if (res.length) for (const r of R) if (res.every(re => re.test(r.hay))) out.push(r.i); }
     if (textCache.size > 200) textCache.clear();
     textCache.set(q, out);
@@ -487,12 +557,13 @@ details.narr .narr-text { margin-top: 8px; font-size: var(--fs-sm); line-height:
     for (const r of R) {
       if (c.kind === "date" ? r.yr >= c.from && r.yr <= c.to
         : c.kind === "tod" ? r.t != null && c.ids.includes(r.t)
+        : c.kind === "src" ? c.ids.includes(r.src)
         : c.kind === "state" ? r.st === c.id
         : r.loc === c.id) out.push(r.i);
     }
     return out;
   }
-  const chipMembers = c => c.kind === "factor" ? post[c.id] : c.kind === "region" ? (regMembers.get(c.id) || [])
+  const chipMembers = c => c.kind === "cohort" ? c.ids : c.kind === "factor" ? post[c.id] : c.kind === "region" ? (regMembers.get(c.id) || [])
     : FILTER_KINDS.has(c.kind) ? filterMembers(c) : textMatch(c.text);
   let matchSet = null, filterKeep = null;
   function refreshMatches() {
@@ -510,8 +581,10 @@ details.narr .narr-text { margin-top: 8px; font-size: var(--fs-sm); line-height:
   }
   const chipColor = c => c.kind === "factor" ? COL[F[c.id].layer] : c.kind === "region" || FILTER_KINDS.has(c.kind) ? INK2 : LIT;
   function chipLabel(c) {
+    if (c.kind === "cohort") return `Analytics cohort · ${c.ids.length.toLocaleString()} reports`;
     if (c.kind === "factor") return short(F[c.id].label);
     if (c.kind === "region") return regById.get(c.id).label;
+    if (c.kind === "src") return c.ids.slice().sort().map(k => SOURCES.find(s => s.id === k)?.label || "Unknown source").join(" + ");
     if (c.kind === "date") return c.from === c.to ? `Year ${c.from}` : `${c.from}–${c.to}`;
     if (c.kind === "tod") return `Local ${c.ids.slice().sort().map(k => TOD_SHORT[k]).join(", ")}`;
     if (c.kind === "state") return STATE.get(c.id)?.label || c.id;
@@ -528,6 +601,7 @@ details.narr .narr-text { margin-top: 8px; font-size: var(--fs-sm); line-height:
   const focus = { nodes: [], links: [], byKey: new Map(), adj: new Map(), sim: null, rel: [], hubs: [], req: [] };
   const requestDraw = () => { if (!raf) raf = requestAnimationFrame(() => { raf = 0; draw(); }); };
   function resize() {
+    if (analyticsOpen) return;
     const b = cv.getBoundingClientRect();
     W = Math.max(1, b.width); H = Math.max(1, b.height);
     DPR = Math.min(2, window.devicePixelRatio || 1);
@@ -571,7 +645,7 @@ details.narr .narr-text { margin-top: 8px; font-size: var(--fs-sm); line-height:
     const b = cv.getBoundingClientRect();
     let x0 = 16, x1 = W - 16, y0 = 16, y1 = H - 40;
     const L = $("#left"), I = $("#insp");
-    const narrow = window.innerWidth <= 760;
+    const narrow = mobileLayout.matches;
     if (!L.hidden && window.innerWidth > 1100) x0 = L.getBoundingClientRect().right - b.left + 16;
     if (!I.hidden) {
       const ib = I.getBoundingClientRect();
@@ -627,6 +701,7 @@ details.narr .narr-text { margin-top: 8px; font-size: var(--fs-sm); line-height:
 
   // ------------------------------------------------------------------ drawing
   function draw() {
+    if (analyticsOpen) return;
     ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
     ctx.globalAlpha = 1;
     ctx.fillStyle = BG;
@@ -675,8 +750,10 @@ details.narr .narr-text { margin-top: 8px; font-size: var(--fs-sm); line-height:
       groups: [{ label: "Night (18–06 local)", c: SLOT[0] }, { label: "Day (06–18 local)", c: SLOT[1] }],
       of: r => r.t == null ? -1 : (r.t === 1 || r.t === 2 ? 1 : 0) },
     year: { label: "Year", other: "",
-      groups: [["2012–13", "#184f95"], ["2014–15", "#256abf"], ["2016–17", "#3987e5"], ["2018–19", "#6da7ec"], ["2020–22", "#b7d3f6"]].map(([label, c]) => ({ label, c })),
-      of: r => r.yr <= 2013 ? 0 : r.yr <= 2015 ? 1 : r.yr <= 2017 ? 2 : r.yr <= 2019 ? 3 : 4 },
+      groups: [["2010–12", "#184f95"], ["2013–15", "#256abf"], ["2016–18", "#3987e5"], ["2019–21", "#6da7ec"], ["2022–26", "#b7d3f6"]].map(([label, c]) => ({ label, c })),
+      of: r => r.yr <= 2012 ? 0 : r.yr <= 2015 ? 1 : r.yr <= 2018 ? 2 : r.yr <= 2021 ? 3 : 4 },
+    source: { label: "Source", other: "",
+      groups: [{label: "ASRS · analyst coded", c: "#6ba9ed"}, {label: "NTSB · investigations", c: "#e8ab68"}, {label: "ASRS · narrative only", c: "#75b7a4"}], of: r => r.src || 0 },
     none: { label: "Nothing (grey)" },
   };
   let colorSets = null;
@@ -726,7 +803,6 @@ details.narr .narr-text { margin-top: 8px; font-size: var(--fs-sm); line-height:
       ctx.fillStyle = quiet ? "rgba(118,128,140,0.30)" : "rgba(168,179,192,0.72)";
       ctx.fill();
     }
-    drawRegionLabels(quiet ? 0.32 : 0.9);
     if (hl && hl.size) {
       dots(hl, r * 3, "rgba(255,233,184,0.10)");
       dots(hl, r * 1.15, LIT);
@@ -751,23 +827,33 @@ details.narr .narr-text { margin-top: 8px; font-size: var(--fs-sm); line-height:
       glow(sx, sy, r * 6);
       ring(sx, sy, r * 2.2, INK, 2);
       ctx.beginPath(); ctx.arc(sx, sy, r * 1.3, 0, TAU); ctx.fillStyle = INK; ctx.fill();
-      label(s.acn, sx, sy + r * 2.2 + 12, INK, "500 11px 'IBM Plex Mono', monospace");
     }
     if (state.hover?.kind === "report" && state.hover.id !== rsel) {
       const h = R[state.hover.id], [x, y] = scr(h.wx, h.wy);
       ring(x, y, r * 2.4, INK, 1.5);
     }
+    // Keep labels above highlighted dots and links so dense matches cannot wash them out.
+    drawRegionLabels(quiet ? 0.88 : 0.82);
+    if (rsel != null) {
+      const s = R[rsel], [sx, sy] = scr(s.wx, s.wy);
+      label(s.acn, sx, sy + r * 2.2 + 12, INK, "500 11px 'IBM Plex Mono', monospace");
+    }
   }
   function drawRegionLabels(alpha) {
     const placed = [];
-    const big = "700 11.5px 'Barlow Semi Condensed', 'Arial Narrow', sans-serif", small = "600 10.5px 'Barlow Semi Condensed', 'Arial Narrow', sans-serif";
+    const big = "600 12px 'Barlow Semi Condensed', 'Arial Narrow', sans-serif", small = "500 11px 'Barlow Semi Condensed', 'Arial Narrow', sans-serif";
+    const detailed = T.k >= 1.6;
+    const area = openArea();
+    const limit = Math.max(5, Math.min(detailed ? 22 : 10, Math.floor((area.x1 - area.x0) / 75)));
     ctx.save();
-    try { ctx.letterSpacing = "0.06em"; } catch (e) {}
+    try { ctx.letterSpacing = "0.025em"; } catch (e) {}
     for (const c of REG) {
+      if (placed.length >= limit) break;
       const [x, y] = scr(c.x * WORLD, c.y * WORLD);
-      const lines = c.label.toUpperCase().split(" · ");
+      const parts = c.label.split(" · ");
+      const lines = detailed ? parts : [clip(parts[0], 42)];
       ctx.font = big;
-      const w = Math.max(...lines.map(l => ctx.measureText(l).width)) + 10, h = lines.length * 14 + 4;
+      const w = Math.max(...lines.map(l => ctx.measureText(l).width)) + 32, h = lines.length * 14 + 18;
       const box = [x - w / 2, y - h / 2, x + w / 2, y + h / 2];
       if (box[2] < 0 || box[0] > W || box[3] < 0 || box[1] > H) continue;
       if (placed.some(b => !(box[2] < b[0] || box[0] > b[2] || box[3] < b[1] || box[1] > b[3]))) continue;
@@ -895,7 +981,7 @@ details.narr .narr-text { margin-top: 8px; font-size: var(--fs-sm); line-height:
       const fn = state.view === "focus" ? focus.byKey.get("r" + o.id) : null;
       const why = fn && fn.c ? `<div class="tw">strength ${fn.c.total.toFixed(2)} · ${esc(reasonText(fn.c))}</div>` : "";
       const reg = r.cl != null && regById.get(r.cl) ? ` · ${esc(regById.get(r.cl).label)}` : "";
-      tip.innerHTML = `<div class="th">ACN ${esc(r.acn)} · ${esc(r.date)}</div><div>${esc(clip(r.synopsis, 170))}</div>${why}<div class="tw">${esc(r.aircraft)}${reg}</div>`;
+      tip.innerHTML = `<div class="th">${esc(idLabel(r))} · ${esc(dateLabel(r))}</div><div>${esc(clip(r.synopsis, 170))}</div>${why}<div class="tw">${esc(r.aircraft)}${reg}</div>`;
     } else {
       const f = F[o.id];
       const fn = focus.byKey.get("f" + o.id);
@@ -934,23 +1020,31 @@ details.narr .narr-text { margin-top: 8px; font-size: var(--fs-sm); line-height:
   // ------------------------------------------------------------------ actions
   function setHash(h) { try { history.replaceState(null, "", h ? "#" + h : location.pathname + location.search); } catch (e) {} }
   function selectReport(i, { pan = true } = {}) {
+    state.compare = null;
+    if (mobileLayout.matches) setLeft(false);
     state.sel = { kind: "report", id: i }; state.listLimit = 30;
     if (state.view === "map") {
-      setHash(`acn${R[i].acn}`);
+      setHash(`report=${encodeURIComponent(U.identity(R[i]))}`);
       if (pan) fitTo(mapPts([i, ...related(i, 12).map(c => c.j)]), { maxK: 4.5, pad: 0.7 });
     }
     renderInspector(); requestDraw(); renderHud();
   }
   function selectFactor(f) {
+    state.compare = null;
+    if (mobileLayout.matches) setLeft(false);
     state.sel = { kind: "factor", id: f }; state.listLimit = 30;
     renderInspector(); requestDraw(); renderHud();
   }
   function clearSel() {
+    state.compare = null;
     state.sel = state.view === "focus" && state.focus != null ? { kind: "report", id: state.focus } : null;
     if (state.view === "map") setHash("");
     renderInspector(); requestDraw(); renderHud();
   }
   function openFocus(i, { fromTrail = false } = {}) {
+    if (mobileLayout.matches) setLeft(false);
+    closeAnalytics();
+    state.compare = null;
     if (fromTrail) state.trail = state.trail.slice(0, state.trail.indexOf(i) + 1);
     else { state.trail = state.trail.filter(x => x !== i); state.trail.push(i); state.trail = state.trail.slice(-8); }
     const already = state.view === "focus";
@@ -958,10 +1052,12 @@ details.narr .narr-text { margin-top: 8px; font-size: var(--fs-sm); line-height:
     renderTrail();
     buildFocus(i);
     fitScene(already);
-    setHash(`focus${R[i].acn}`);
+    setHash(`focus=${encodeURIComponent(U.identity(R[i]))}`);
     renderInspector(); renderHud(); requestDraw();
   }
   function setView(v) {
+    closeAnalytics();
+    state.compare = null;
     if (v === state.view) return;
     if (v === "focus") {
       const target = state.sel?.kind === "report" ? state.sel.id : state.focus;
@@ -974,13 +1070,15 @@ details.narr .narr-text { margin-top: 8px; font-size: var(--fs-sm); line-height:
     renderTrail();
     const t = scenes[v].t;
     if (t) d3.select(cv).call(zoom.transform, t); else fitScene(false);
-    setHash(v === "focus" ? `focus${R[state.focus].acn}` : state.sel?.kind === "report" ? `acn${R[state.sel.id].acn}` : "");
+    setHash(v === "focus" ? `focus=${encodeURIComponent(U.identity(R[state.focus]))}` : state.sel?.kind === "report" ? `report=${encodeURIComponent(U.identity(R[state.sel.id]))}` : "");
     hideTip(); renderInspector(); renderHud(); requestDraw();
   }
   function addChip(c) {
+    state.compare = null;
     const same = x => x.kind === c.kind && (c.kind === "text" ? x.text === c.text : x.id === c.id);
     if (!state.chips.some(same)) state.chips.push(c);
     $("#q").value = ""; state.preview = null; closePalette();
+    if (mobileLayout.matches) $("#q").blur();
     refreshMatches(); renderChips();
     if (state.view === "focus") { buildFocus(state.focus); state.sel = { kind: "report", id: state.focus }; }
     else { state.sel = null; if (matchSet && matchSet.size) fitTo(mapPts([...matchSet]), { maxK: 3.5 }); }
@@ -988,8 +1086,10 @@ details.narr .narr-text { margin-top: 8px; font-size: var(--fs-sm); line-height:
     renderInspector(); renderHud(); requestDraw();
   }
   function removeChip(k) {
+    state.compare = null;
     state.chips.splice(k, 1);
     refreshMatches(); renderChips();
+    if (q.value.trim()) runSearch(); else state.preview = null;
     if (state.view === "focus") buildFocus(state.focus);
     renderInspector(); renderHud(); requestDraw();
   }
@@ -1023,7 +1123,7 @@ details.narr .narr-text { margin-top: 8px; font-size: var(--fs-sm); line-height:
   const factorItem = (f, toks = []) => ({ act: () => addChip({ kind: "factor", id: f }),
     html: `<span class="ic sq" style="--c:${COL[F[f].layer]}"></span><span class="main"><span class="t">${hiText(F[f].label, toks)}${F[f].src === "llm" ? ' <span class="ai">AI</span>' : ""}</span><span class="s">${esc(TI[F[f].layer].label)} · add as a filter</span></span><span class="n">${F[f].df}</span>` });
   const reportItem = (i, toks = []) => ({ act: () => { closePalette(); q.blur(); selectReport(i); },
-    html: `<span class="ic ring"></span><span class="main"><span class="t mono">${esc(R[i].acn)} · ${esc(R[i].date)} · ${esc(R[i].aircraft)}</span><span class="s">${hiText(snippet(R[i].synopsis, toks), toks)}</span></span><span class="n"></span>` });
+    html: `<span class="ic ring"></span><span class="main"><span class="t mono">${esc(idLabel(R[i]))} · ${esc(dateLabel(R[i]))} · ${esc(R[i].aircraft)}</span><span class="s">${hiText(snippet(R[i].summary || R[i].synopsis, toks), toks)}</span></span><span class="n"></span>` });
   const regionItem = (c, toks = []) => ({ act: () => { if (state.view !== "map") setView("map"); addChip({ kind: "region", id: c.id }); },
     html: `<span class="ic dia" style="--c:${INK2}"></span><span class="main"><span class="t">${hiText(c.label, toks)}</span><span class="s">Region on the map</span></span><span class="n">${c.n}</span>` });
   function runSearch() {
@@ -1031,9 +1131,9 @@ details.narr .narr-text { margin-top: 8px; font-size: var(--fs-sm); line-height:
     const sections = [];
     if (!text) {
       state.preview = null;
-      sections.push({ h: "Start from an example", items: (META.examples || []).filter(x => byAcn.has(x.acn)).map(x => {
+      sections.push({ h: "Start from an example", items: (META.examples || []).filter(x => byAcn.has(x.acn) && (!matchSet || matchSet.has(byAcn.get(x.acn)))).map(x => {
         const i = byAcn.get(x.acn);
-        return { act: () => { closePalette(); q.blur(); openFocus(i); }, html: `<span class="ic ring"></span><span class="main"><span class="t">${esc(x.label)}</span><span class="s mono">ACN ${esc(x.acn)} · ${esc(R[i].date)} · ${esc(R[i].aircraft)}</span></span><span class="n">focus</span>` };
+        return { act: () => { closePalette(); q.blur(); openFocus(i); }, html: `<span class="ic ring"></span><span class="main"><span class="t">${esc(x.label)}</span><span class="s mono">${esc(idLabel(R[i]))} · ${esc(dateLabel(R[i]))} · ${esc(R[i].aircraft)}</span></span><span class="n">focus</span>` };
       }) });
       sections.push({ h: "Common factors", items: POPULAR.map(l => F.findIndex(f => f.label === l)).filter(f => f >= 0).map(f => factorItem(f)) });
       sections.push({ h: "Or type", items: QUERIES.map(w => ({ act: () => { q.value = w; runSearch(); }, html: `<span class="ic q">${SEARCH_ICON}</span><span class="main"><span class="t mono">${esc(w)}</span></span><span class="n"></span>` })) });
@@ -1048,13 +1148,13 @@ details.narr .narr-text { margin-top: 8px; font-size: var(--fs-sm); line-height:
       }
       fac.sort((a, b) => b[1] - a[1]);
       const reg = REG.filter(c => res.every(re => re.test(c.label.toLowerCase())));
-      const ids = textMatch(text);
-      const rep = ids.map(i => { let s = R[i].events ? 0.2 : 0; for (const re of res) s += re.test(R[i].syn) ? 2 : 1; return [i, s]; })
-        .sort((a, b) => b[1] - a[1] || R[b[0]].f.length - R[a[0]].f.length);
-      state.preview = ids.length ? new Set(ids) : null;
+      const ids = textMatch(text).filter(i => !matchSet || matchSet.has(i));
+      const rep = ids.map(i => [i, U.searchScore(R[i], res, text)])
+        .sort((a, b) => b[1] - a[1] || R[b[0]].date.localeCompare(R[a[0]].date) || a[0] - b[0]);
+      state.preview = new Set(ids);
       if (fac.length) sections.push({ h: "Factors", n: `${fac.length}`, items: fac.slice(0, 6).map(([f]) => factorItem(f, toks)) });
       if (reg.length) sections.push({ h: "Regions", items: reg.slice(0, 3).map(c => regionItem(c, toks)) });
-      if (rep.length) sections.push({ h: "Reports", n: `${ids.length} match${ids.length === 1 ? "" : "es"} · lit on the map`, items: rep.slice(0, 6).map(([i]) => reportItem(i, toks)) });
+      if (rep.length) sections.push({ h: "Reports · keyword matches", n: sourceCounts(ids), items: rep.slice(0, 6).map(([i]) => reportItem(i, toks)) });
       if (ids.length > 1) sections.push({ h: "", items: [{ act: () => addChip({ kind: "text", text }), html: `<span class="ic sq" style="--c:${LIT}"></span><span class="main"><span class="t">Filter to all ${ids.length} reports matching “${esc(text)}”</span></span><span class="n"></span>` }] });
       if (!sections.length) sections.push({ h: "No matches", items: [], empty: `Nothing matches “${esc(text)}”. Try fewer words, an aircraft type (737), an airport code (DEN) or a report number.` });
     }
@@ -1064,7 +1164,8 @@ details.narr .narr-text { margin-top: 8px; font-size: var(--fs-sm); line-height:
     pal.innerHTML = sections.map(s => `${s.h ? `<div class="pal-h"><span class="label">${esc(s.h)}</span>${s.n ? `<span class="label">${esc(s.n)}</span>` : ""}</div>` : ""}${s.empty ? `<p class="hint" style="padding:4px 8px 10px">${s.empty}</p>` : ""}${s.items.map(it => `<button type="button" class="pal-item" role="option" data-k="${k++}" aria-selected="false">${it.html}</button>`).join("")}`).join("")
       + `<div class="pal-foot"><span><kbd>↑</kbd> <kbd>↓</kbd> move</span><span><kbd>↵</kbd> open</span><span><kbd>esc</kbd> close</span><span><kbd>⌫</kbd> remove last filter</span></div>`;
     pal.querySelectorAll(".pal-item").forEach(b => {
-      b.addEventListener("mousedown", e => { e.preventDefault(); const it = palItems[+b.dataset.k]; if (it) it.act(); });
+      b.addEventListener("mousedown", e => e.preventDefault());
+      b.addEventListener("click", () => { const it = palItems[+b.dataset.k]; if (it) it.act(); });
       b.addEventListener("mousemove", () => { if (palIdx !== +b.dataset.k) { palIdx = +b.dataset.k; markPal(); } });
     });
     markPal();
@@ -1083,7 +1184,7 @@ details.narr .narr-text { margin-top: 8px; font-size: var(--fs-sm); line-height:
     if (e.key === "ArrowDown" && palItems.length) { e.preventDefault(); palIdx = (palIdx + 1) % palItems.length; markPal(); }
     else if (e.key === "ArrowUp" && palItems.length) { e.preventDefault(); palIdx = (palIdx - 1 + palItems.length) % palItems.length; markPal(); }
     else if (e.key === "Enter") { e.preventDefault(); const it = palItems[palIdx]; if (it) it.act(); }
-    else if (e.key === "Escape") { closePalette(); q.blur(); }
+    else if (e.key === "Escape") { e.preventDefault(); e.stopPropagation(); closePalette(); q.blur(); }
     else if (e.key === "Backspace" && !q.value && state.chips.length) removeChip(state.chips.length - 1);
   });
   $("#omni").addEventListener("click", e => { if (!e.target.closest("button")) q.focus(); });
@@ -1094,15 +1195,27 @@ details.narr .narr-text { margin-top: 8px; font-size: var(--fs-sm); line-height:
   });
   function renderChips() {
     $("#chips").innerHTML = state.chips.map((c, k) => `<span class="chip ${c.kind}" style="--c:${chipColor(c)}"><span class="dot"></span><span class="txt">${esc(chipLabel(c))}</span><button type="button" data-act="rm-chip" data-k="${k}" aria-label="Remove filter ${esc(chipLabel(c))}">×</button></span>`).join("");
-    q.placeholder = state.chips.length ? "Add another filter…" : "Search reports, factors, aircraft, airports…";
+    q.placeholder = state.chips.length ? "Add another filter…" : "Search ASRS + NTSB reports…";
     syncFilters();
   }
 
   // ------------------------------------------------------------------ date, time and place filters
-  const fFrom = $("#f-from"), fTo = $("#f-to"), fTod = $("#f-tod"), fState = $("#f-state"), fApt = $("#f-apt");
+  const fSrc = $("#f-src"), fFrom = $("#f-from"), fTo = $("#f-to"), fTod = $("#f-tod"), fState = $("#f-state"), fApt = $("#f-apt");
   function buildFilters() {
     const yrs = YEARS.map(y => `<option value="${y}">${y}</option>`).join("");
     fFrom.innerHTML = yrs; fTo.innerHTML = yrs;
+    fSrc.innerHTML = [
+      { id: 'all', label: 'All reports', count: N },
+      { id: 'asrs', label: 'ASRS', count: R.filter(r => r.src !== 1).length },
+      { id: 'ntsb', label: 'NTSB', count: R.filter(r => r.src === 1).length }
+    ].map(x => `<button type="button" data-src="${x.id}" aria-pressed="${x.id === 'all'}" ${x.count ? '' : 'disabled'}>${x.label}<b>${x.count.toLocaleString()}</b></button>`).join('');
+    fSrc.onclick = e => {
+      const b = e.target.closest("button[data-src]");
+      if (!b) return;
+      const scope = b.dataset.src;
+      const ids = SOURCES.filter(x => scope === 'ntsb' ? x.id === 1 : x.id !== 1).map(x => x.id);
+      setFilter("src", scope === 'all' ? null : { kind: "src", ids });
+    };
     fTod.innerHTML = TOD_SHORT.map((t, k) => `<button type="button" data-tod="${k}" aria-pressed="false" title="${esc(TOD[k] || t)} local time">${t}</button>`).join("");
     fState.innerHTML = `<option value="">Anywhere</option>` + (META.states || []).slice().sort((a, b) => a.label.localeCompare(b.label))
       .map(s => `<option value="${esc(s.id)}">${esc(s.label)} (${s.n.toLocaleString()})</option>`).join("");
@@ -1140,30 +1253,36 @@ details.narr .narr-text { margin-top: 8px; font-size: var(--fs-sm); line-height:
   // Keep the panel controls in step with the chips (chips can also be removed from the search bar).
   function syncFilters() {
     const get = kind => state.chips.find(c => c.kind === kind);
-    const d = get("date"), t = get("tod"), s = get("state"), a = get("apt");
+    const d = get("date"), t = get("tod"), s = get("state"), a = get("apt"), so = get("src");
+    fSrc.querySelectorAll("button").forEach(b => b.setAttribute("aria-pressed", String(b.dataset.src === "all" ? !so : !!so && (b.dataset.src === "ntsb" ? so.ids.includes(1) : !so.ids.includes(1)))));
     fFrom.value = String(d ? d.from : YEARS[0]); fTo.value = String(d ? d.to : YEARS[YEARS.length - 1]);
     fTod.querySelectorAll("button").forEach(b => b.setAttribute("aria-pressed", String(!!t && t.ids.includes(+b.dataset.tod))));
     fState.value = s ? s.id : "";
     if (document.activeElement !== fApt) fApt.value = a ? a.id : "";
-    $("#f-clear").hidden = !(d || t || s || a);
+    $("#f-clear").hidden = !(d || t || s || a || so);
     $("#f-note").textContent = filterKeep
       ? `${filterKeep.size.toLocaleString()} reports match. Related-report lists and the focus graph stay within them.`
-      : "Local time of day. ASRS withholds the airport in most reports, so the airport filter covers only those that name one.";
+      : "Local time of day. ASRS withholds the airport in most reports, so the airport filter covers only those that name one. * ASRS reports 2021–2025 without analyst codes; their month is estimated from the ACN.";
   }
 
   // ------------------------------------------------------------------ inspector
   // Narratives are split into shards of META.shard reports (by position in R), fetched on demand.
   const shards = new Map();
-  async function loadNarrative(acn, el) {
+  async function loadNarrative(id, el) {
     try {
-      const k = Math.floor(byAcn.get(acn) / META.shard);
-      if (!shards.has(k)) shards.set(k, fetch(`data/narratives/${k}.json`).then(r => { if (!r.ok) throw new Error(r.status); return r.json(); }));
-      el.textContent = (await shards.get(k))[acn] || "No narrative on file.";
+      const i = byId.get(id) ?? byAcn.get(id), r = R[i];
+      const k = Math.floor(i / META.shard);
+      if (!shards.has(k)) shards.set(k, fetch(`data/narratives/${k}.json`, { cache: "no-cache" }).then(r => { if (!r.ok) throw new Error(r.status); return r.json(); }));
+      const shard = await shards.get(k), v = shard[U.identity(r)] || shard[r.acn];
+      if (v && typeof v === "object") {
+        el.innerHTML = (v.s && !r.summary && r.src !== 2 ? `<p class="hint"><b>AI summary:</b> ${esc(v.s)}</p>` : "")
+          + `<p>${esc(v.n || "No narrative on file.")}</p>`;
+      } else el.textContent = v || "No narrative on file.";
     } catch (e) { shards.clear(); el.textContent = "Could not load the narrative."; }
   }
   const fchip = (f, on = false) => `<button type="button" class="fchip${on ? " on" : ""}" style="--c:${COL[F[f].layer]}" data-act="factor" data-f="${f}" title="${esc(TI[F[f].layer].label)} · on ${F[f].df} reports">${esc(short(F[f].label))}${F[f].src === "llm" ? ' <span class="ai">AI</span>' : ""}</button>`;
-  const rowHTML = i => `<button type="button" class="row" data-act="report" data-i="${i}"><span class="acn">${esc(R[i].acn)}</span><span class="rt">${esc(R[i].synopsis)}</span><span class="rm">${esc(R[i].date)} · ${esc(R[i].aircraft)}</span></button>`;
-  const simRow = c => `<button type="button" class="row" data-act="report" data-i="${c.j}"><span class="acn">${esc(R[c.j].acn)}</span><span class="rt">${esc(reasonText(c))}</span><span class="rm">${esc(R[c.j].date)} · ${esc(R[c.j].aircraft)} · strength ${c.total.toFixed(2)}</span><span class="bar">${segs(c)}</span></button>`;
+  const rowHTML = i => `<button type="button" class="row" data-act="report" data-i="${i}"><span class="acn${R[i].src === 1 ? " ntsb" : ""}">${esc(R[i].acn)}</span><span class="rt">${esc(R[i].summary || R[i].synopsis)}</span><span class="rm">${esc(dateLabel(R[i]))} · ${esc(R[i].aircraft)}</span></button>`;
+  const simRow = c => `<button type="button" class="row" data-act="report" data-i="${c.j}"><span class="acn${R[c.j].src === 1 ? " ntsb" : ""}">${esc(R[c.j].acn)}</span><span class="rt">${esc(reasonText(c))}</span><span class="rm">${esc(dateLabel(R[c.j]))} · ${esc(R[c.j].aircraft)} · strength ${c.total.toFixed(2)}</span><span class="bar">${segs(c)}</span></button>`;
   function listMore(ids) {
     const shown = ids.slice(0, state.listLimit).map(rowHTML).join("");
     const rest = ids.length - state.listLimit;
@@ -1182,7 +1301,7 @@ details.narr .narr-text { margin-top: 8px; font-size: var(--fs-sm); line-height:
 
   function llmBlock(r) {
     const coded = r.f.filter(f => F[f].src === "llm").sort((a, b) => F[b].idf - F[a].idf);
-    if (!r.events && !coded.length) return `<div class="block"><p class="label">Local LLM</p><p class="hint">Not coded yet: the local model has read ${META.n_llm_coded.toLocaleString()} of ${N.toLocaleString()} reports so far.</p></div>`;
+    if (!r.events && !coded.length) return "";
     const fs = coded.length ? `<div class="fchips">${coded.map(f => fchip(f)).join("")}</div><p class="hint">Events, causes and equipment the model named in the narrative. Not checked by hand; read the narrative to confirm.</p>` : `<p class="hint">No event, cause or equipment phrase common enough to link reports.</p>`;
     const ev = r.events?.length ? `<div class="block"><p class="label">Cause and effect · LLM summary</p><ol class="events">${r.events.map(e => `<li>${esc(e)}</li>`).join("")}</ol></div>` : "";
     return `<div class="block"><p class="label">Coded by the local LLM</p>${fs}</div>${ev}`;
@@ -1207,7 +1326,38 @@ details.narr .narr-text { margin-top: 8px; font-size: var(--fs-sm); line-height:
     const seq = (s.events || r.events) ? `<div class="block"><p class="label">Cause and effect · LLM summaries</p><div class="seq-pair">
       <div><span class="label">Center ${esc(s.acn)}</span>${s.events ? `<ol class="events">${s.events.map(e => `<li>${esc(e)}</li>`).join("")}</ol>` : `<p class="hint">Not coded yet.</p>`}</div>
       <div><span class="label">This ${esc(r.acn)}</span>${r.events ? `<ol class="events">${r.events.map(e => `<li>${esc(e)}</li>`).join("")}</ol>` : `<p class="hint">Not coded yet.</p>`}</div></div></div>` : "";
-    return `<div class="block"><p class="label">Why it links to ACN ${esc(s.acn)}</p><div class="strength"><span>strength ${c.total.toFixed(2)}</span><div class="bar" role="img" aria-label="Share of the link by type">${segs(c)}</div></div>${groups}</div>${seq}`;
+    return `<div class="block"><p class="label">Why it links to ${esc(idLabel(s))}</p><div class="strength"><span>strength ${c.total.toFixed(2)}</span><div class="bar" role="img" aria-label="Share of the link by type">${segs(c)}</div></div>${groups}</div>${seq}`;
+  }
+
+  function sourceCounts(ids) {
+    const ntsb = ids.filter(i => R[i].src === 1).length;
+    return `${(ids.length - ntsb).toLocaleString()} ASRS · ${ntsb.toLocaleString()} NTSB`;
+  }
+  function sourceCards() {
+    const ntsb = R.filter(r => r.src === 1).length;
+    return `<button class="source-card" type="button" data-act="scope" data-source="asrs"><span class="label">NASA ASRS</span><b>${(N - ntsb).toLocaleString()}</b><small>Voluntary safety reports</small></button><button type="button" class="source-card ntsb" data-act="scope" data-source="ntsb" ${ntsb ? "" : "disabled"}><span class="label">NTSB</span><b>${ntsb.toLocaleString()}</b><small>Accident & incident investigations</small></button>`;
+  }
+  function sharedFactors(a, b) {
+    return R[a].f.filter(f => F[f].src !== "llm" && R[b].fs.has(f)).sort((x, y) => F[y].idf - F[x].idf);
+  }
+  function crossBlock(i) {
+    if (!R.some(r => U.family(r) !== U.family(R[i]))) return '';
+    let allowed = null;
+    for (const c of state.chips.filter(c => FILTER_KINDS.has(c.kind) && c.kind !== 'src')) {
+      const ids = new Set(filterMembers(c));
+      allowed = allowed ? new Set([...allowed].filter(j => ids.has(j))) : ids;
+    }
+    const matches = U.crossMatches(R, i, allowed).slice(0, 4);
+    const target = R[i].src === 1 ? 'ASRS' : 'NTSB';
+    return `<section class="cross-section"><p class="label">Across sources · related ${target} reports</p>
+      <p class="hint">Similar narratives from the other reporting system. Date and place filters apply. These are not confirmed same-incident links.</p>
+      ${matches.length ? matches.map(([j, cosine]) => `<div class="cross-row"><span class="mono">${esc(idLabel(R[j]))}</span><button type="button" class="linkbtn" data-act="compare" data-from="${i}" data-i="${j}">Compare →</button><p>${esc(clip(R[j].summary || R[j].synopsis, 190))}</p><small>Narrative cosine ${cosine.toFixed(3)} · ${sharedFactors(i, j).length} shared coded factors</small></div>`).join('') : `<p class="hint">${R[i].cross ? 'No exported cross-source matches meet these filters. Try a broader date or place.' : 'Cross-source narrative matches are not available in this export.'}</p>`}</section>`;
+  }
+  function viewCompare(a, b) {
+    const shared = sharedFactors(a, b);
+    const cosine = (R[a].cross || []).find(([j]) => j === b)?.[1];
+    const card = i => { const r = R[i]; return `<section class="compare-card ${r.src === 1 ? 'ntsb' : ''}"><p class="label">${U.family(r)} · ${esc(dateLabel(r))}</p><h3>${esc(idLabel(r))}</h3><p class="hint">${esc(r.aircraft)} · ${esc(whenWhere(r))}</p><p class="label">${r.summary ? 'AI narrative summary' : esc(U.summaryLabel(r, META.summary_model))}</p><p>${esc(r.summary || r.synopsis)}</p><button type="button" class="linkbtn" data-act="report" data-i="${i}">Open report and original text →</button></section>`; };
+    return `<button type="button" class="back" data-act="report" data-i="${a}">← Back to ${esc(idLabel(R[a]))}</button><div class="ihead"><span class="label">ASRS ↔ NTSB</span><h2>Compare the evidence</h2><p class="hint">${cosine != null ? `Narrative cosine ${cosine.toFixed(3)}. ` : ''}A similarity score is not a probability that these reports describe the same incident.</p></div><div class="comparison-grid">${card(a)}${card(b)}</div><section><p class="label">Shared coded factors · ${shared.length}</p>${shared.length ? `<div class="fchips">${shared.map(f => fchip(f)).join('')}</div>` : '<p class="hint">No identical coded factors. This match comes from narrative similarity.</p>'}<p class="hint">Only identical factor labels within the same category are aligned. ASRS and NTSB retain their own source coding.</p></section><section><p class="label">Read each source on its own terms</p><p class="hint">ASRS captures a reporter’s experience. NTSB records factual investigation narratives and, where available, an official probable cause. AI summaries describe the narratives and do not replace those source records.</p></section>`;
   }
 
   function viewReport(i) {
@@ -1218,18 +1368,20 @@ details.narr .narr-text { margin-top: 8px; font-size: var(--fs-sm); line-height:
     const reg = r.cl != null ? regById.get(r.cl) : null;
     const back = inFocus && !isCenter ? `<button type="button" class="back" data-act="report" data-i="${state.focus}">← Center report ${esc(R[state.focus].acn)}</button>`
       : !inFocus && matchSet ? `<button type="button" class="back" data-act="back-set">← ${matchSet.size} matching reports</button>` : "";
-    const sibs = (r.sib || []).map(j => `<button type="button" class="linkbtn" data-act="report" data-i="${j}">ACN ${esc(R[j].acn)}</button>`).join(", ");
+    const sibs = (r.sib || []).map(j => `<button type="button" class="linkbtn" data-act="report" data-i="${j}">${esc(idLabel(R[j]))}</button>`).join(", ");
     return `${back}
       <div class="ihead"><div class="eyebrow"><span class="label">${isCenter ? "Center report" : "Report"}</span>${reg ? `<button type="button" class="linkbtn" data-act="region" data-id="${reg.id}">${esc(reg.label)}</button>` : ""}</div>
-        <h2 class="mono">ACN ${esc(r.acn)}</h2><div class="meta">${esc(r.date)} · ${esc(r.aircraft)}</div>${whenWhere(r) ? `<div class="meta">${esc(whenWhere(r))}</div>` : ""}</div>
+        <h2 class="mono">${esc(idLabel(r))}</h2><div class="meta">${r.src === 1 ? "NTSB investigation" : r.src === 2 ? "ASRS · narrative only" : "ASRS · analyst coded"} · ${esc(dateLabel(r))}${r.de ? " (estimated from the ACN)" : ""}${r.aircraft ? ` · ${esc(r.aircraft)}` : ""}</div>${whenWhere(r) ? `<div class="meta">${esc(whenWhere(r))}</div>` : ""}</div>
       <div class="actions">${isCenter ? `<button type="button" class="btn ghost" data-act="view-map">Show it on the map</button>` : `<button type="button" class="btn" data-act="focus" data-i="${i}">Focus graph on this report</button>`}</div>
       ${sibs ? `<p class="hint">Other reports of this same event: ${sibs}</p>` : ""}
       ${fn && fn.c ? whyBlock(fn.c, state.focus) : ""}
-      <div class="block"><p class="label">ASRS analyst synopsis</p><p>${esc(r.synopsis)}</p></div>
+      <div class="block"><p class="label">${esc(U.summaryLabel(r, META.summary_model))}</p><p>${esc(r.synopsis)}</p></div>
+      ${r.summary && r.synopsis_kind !== "generated" && r.src !== 2 ? `<div class="block ai-summary"><p class="label">AI narrative summary · ${esc(META.summary_model || "local model")}</p><p>${esc(r.summary)}</p></div>` : ""}
+      ${crossBlock(i)}
       ${llmBlock(r)}
       <div class="block"><p class="label">Factors · click one to explore it</p>${factorGroups(r, fn && fn.c ? new Set(fn.c.shared) : null)}</div>
       ${fn ? "" : `<div class="block"><p class="label">Most similar reports</p><div class="rows">${related(i, 8).map(simRow).join("")}</div></div>`}
-      <details class="narr" data-acn="${esc(r.acn)}"><summary>Read the reporter's narrative</summary><div class="narr-text">Loading…</div></details>`;
+      <details class="narr" data-acn="${esc(U.identity(r))}"><summary>${NARR_LABEL[r.src]}</summary><div class="narr-text">Loading…</div></details>`;
   }
   function viewFactor(f) {
     const x = F[f], ids = post[f];
@@ -1238,7 +1390,7 @@ details.narr .narr-text { margin-top: 8px; font-size: var(--fs-sm); line-height:
     const onChip = state.chips.some(c => c.kind === "factor" && c.id === f);
     const back = state.view === "focus" ? `<button type="button" class="back" data-act="report" data-i="${state.focus}">← Center report ${esc(R[state.focus].acn)}</button>` : matchSet ? `<button type="button" class="back" data-act="back-set">← ${matchSet.size} matching reports</button>` : "";
     return `${back}
-      <div class="ihead"><div class="eyebrow"><span class="swatch" style="--c:${COL[x.layer]}"></span><span class="label">${esc(TI[x.layer].label)}${x.src === "llm" ? " · coded by the local LLM" : " · ASRS analyst code"}</span></div>
+      <div class="ihead"><div class="eyebrow"><span class="swatch" style="--c:${COL[x.layer]}"></span><span class="label">${esc(TI[x.layer].label)}${x.src === "llm" ? " · coded by the local LLM" : x.src === "ntsb" ? " · NTSB coded field" : x.src === "shared" ? " · ASRS + NTSB coded fields" : " · ASRS analyst code"}</span></div>
         <h2>${esc(x.label)}</h2><div class="meta">On <b>${x.df}</b> of ${N.toLocaleString()} reports (${(100 * x.df / N).toFixed(1)}%)</div></div>
       <div class="actions">${onChip ? `<span class="hint">This is one of your filters.</span>` : `<button type="button" class="btn" data-act="${state.view === "focus" ? "map-factor" : "add-factor"}" data-f="${f}">${state.view === "focus" ? `See all ${x.df} on the map` : `Filter to these ${x.df} reports`}</button>`}</div>
       ${fn ? `<div class="block"><p class="label">Related reports here that share it · ${inRel.length}</p><div class="rows">${inRel.map(rowHTML).join("")}</div></div>` : ""}
@@ -1248,30 +1400,55 @@ details.narr .narr-text { margin-top: 8px; font-size: var(--fs-sm); line-height:
   function viewSet() {
     const ids = [...matchSet];
     const ex = new Set(state.chips.filter(c => c.kind === "factor").map(c => c.id));
-    return `<div class="ihead"><span class="label">Filtered reports</span><h2>${ids.length} report${ids.length === 1 ? "" : "s"} match</h2>
+    return `<div class="ihead"><span class="label">Filtered reports · ${sourceCounts(ids)}</span><h2>${ids.length.toLocaleString()} report${ids.length === 1 ? "" : "s"} match</h2>
         <div class="fchips">${state.chips.map(c => `<span class="chip ${c.kind}" style="--c:${chipColor(c)}"><span class="dot"></span><span class="txt">${esc(chipLabel(c))}</span></span>`).join("")}</div></div>
       <div class="actions">${ids.length ? `<button type="button" class="btn ghost" data-act="fit-set">Zoom the map to them</button>` : ""}<button type="button" class="btn ghost" data-act="clear-chips">Clear filters</button></div>
       ${ids.length ? `<div class="block"><p class="label">Narrow it down</p>${coocHTML(cooccur(ids, ex), "the matches")}</div>
       <div class="block"><p class="label">Reports · newest first</p>${listMore(byDate(ids))}</div>` : `<p class="hint">No report has all of these. Remove a filter from the search bar.</p>`}`;
   }
   function viewWelcome() {
-    return `<div class="ihead"><span class="label">${N.toLocaleString()} safety reports</span><h2>Find reports that resemble each other, and see why</h2></div>
+    return `<div class="ihead"><span class="label">${N.toLocaleString()} safety reports</span><h2>Two sources. One search.
+      Different perspectives.</h2></div>
+      <p class="hint">Explore voluntary ASRS reports alongside NTSB investigations. Follow a shared safety issue across both collections.</p>
+      <div class="source-overview">${sourceCards()}</div>
       <ol class="tips">
-        <li><b>Search</b> for a factor, an aircraft, an airport or any word. Matching reports light up on the map as you type. Press <kbd>/</kbd> to start.</li>
+        <li><b>Search</b> summaries, source abstracts, factors, aircraft or case numbers. Use the source controls to search both collections or either one. Matching reports light up on the map as you type. Press <kbd>/</kbd> to start.</li>
         <li><b>Combine</b> factors as filters: pick “Runway incursion”, then add a human-factor or weather factor.</li>
-        <li><b>Open a report</b> and choose Focus to see the reports most like it, joined through the factors they share.</li>
+        <li><b>Open a report</b> to read its AI summary and original text. Choose a cross-source match to compare ASRS and NTSB evidence, or Focus to explore its neighbours.</li>
       </ol>
       <div class="block"><p class="label">Try a search</p><div class="qbtns">${QUERIES.map(w => `<button type="button" data-act="query" data-q="${esc(w)}">${esc(w)}</button>`).join("")}</div></div>
       <div class="block"><p class="label">Reading the map</p><p class="hint">Each dot is one report. Reports that tell similar stories sit close together, and each label names what most reports in that region have in common. Distance on the map is a rough guide; the focus graph shows the exact links.</p></div>`;
   }
+  let inspectorKey = "";
+  function setSheet(mode) {
+    stage.classList.toggle("sheet-peek", mode === "peek");
+    stage.classList.toggle("sheet-expanded", mode === "expanded");
+    const handle = $(".sheet-handle"), expand = $(".sheet-expand");
+    if ($("#inspector-content")) $("#inspector-content").inert = mode === "peek";
+    if (handle) {
+      handle.textContent = mode === "peek" ? "Show details" : "Minimise details";
+      handle.setAttribute("aria-expanded", String(mode !== "peek"));
+    }
+    if (expand) {
+      expand.textContent = mode === "expanded" ? "Restore" : "Expand";
+      expand.setAttribute("aria-pressed", String(mode === "expanded"));
+    }
+  }
   function renderInspector() {
     const el = $("#insp");
+    stage.classList.toggle("comparing", !!state.compare);
     let html;
-    if (state.sel?.kind === "report") html = viewReport(state.sel.id);
+    if (state.compare) html = viewCompare(...state.compare);
+    else if (state.sel?.kind === "report") html = viewReport(state.sel.id);
     else if (state.sel?.kind === "factor") html = viewFactor(state.sel.id);
     else if (matchSet) html = viewSet();
     else html = viewWelcome();
-    el.innerHTML = `<button type="button" class="sheet-handle" data-act="sheet" aria-label="Expand or collapse the details"></button>` + html;
+    const key = state.compare ? `compare:${state.compare.join(":")}`
+      : state.sel ? `${state.sel.kind}:${state.sel.id}` : matchSet ? "matches" : "welcome";
+    if (key !== inspectorKey) { setSheet(""); inspectorKey = key; }
+    el.innerHTML = `<div class="sheet-tools"><button type="button" class="sheet-handle" data-act="sheet" aria-expanded="true" aria-controls="inspector-content">Minimise details</button><button type="button" class="sheet-expand" data-act="sheet-expand" aria-pressed="false">Expand</button></div><div id="inspector-content" style="display:contents">${html}</div>`;
+    setSheet(stage.classList.contains("sheet-peek") ? "peek"
+      : stage.classList.contains("sheet-expanded") ? "expanded" : "");
     el.querySelectorAll("details.narr[data-acn]").forEach(d => d.addEventListener("toggle", () => { if (d.open) loadNarrative(d.dataset.acn, d.querySelector(".narr-text")); }));
     el.scrollTop = 0;
   }
@@ -1280,27 +1457,31 @@ details.narr .narr-text { margin-top: 8px; font-size: var(--fs-sm); line-height:
     const el = e.target.closest("[data-act]");
     if (!el) return;
     const a = el.dataset.act, n = k => +el.dataset[k];
-    if (a === "report") selectReport(n("i"));
+    if (a === "scope") { setFilter("src", {kind: "src", ids: SOURCES.filter(x => el.dataset.source === "ntsb" ? x.id === 1 : x.id !== 1).map(x => x.id)}); }
+    else if (a === "compare") { state.compare = [n("from"), n("i")]; setLeft(false); renderInspector(); requestDraw(); }
+    else if (a === "report") selectReport(n("i"));
     else if (a === "focus") openFocus(n("i"));
     else if (a === "factor") selectFactor(n("f"));
     else if (a === "add-factor") addChip({ kind: "factor", id: n("f") });
     else if (a === "map-factor") { const f = n("f"); setView("map"); addChip({ kind: "factor", id: f }); }
     else if (a === "region") { if (state.view !== "map") setView("map"); addChip({ kind: "region", id: n("id") }); }
     else if (a === "rm-chip") removeChip(n("k"));
-    else if (a === "clear-chips") { state.chips = []; refreshMatches(); renderChips(); if (state.view === "focus") buildFocus(state.focus); renderInspector(); renderHud(); requestDraw(); }
-    else if (a === "back-set") { state.sel = null; renderInspector(); requestDraw(); renderHud(); }
+    else if (a === "clear-chips") { state.compare = null; state.chips = []; refreshMatches(); renderChips(); if (state.view === "focus") buildFocus(state.focus); renderInspector(); renderHud(); requestDraw(); }
+    else if (a === "back-set") { state.compare = null; state.sel = null; renderInspector(); requestDraw(); renderHud(); }
     else if (a === "fit-set") { if (state.view !== "map") setView("map"); fitTo(mapPts([...matchSet]), { maxK: 4 }); }
     else if (a === "query") { q.value = el.dataset.q; q.focus(); runSearch(); }
     else if (a === "trail") openFocus(n("i"), { fromTrail: true });
     else if (a === "view-map") { const i = state.focus; setView("map"); selectReport(i); }
     else if (a === "more") { state.listLimit += 30; const st = $("#insp").scrollTop; renderInspector(); $("#insp").scrollTop = st; }
-    else if (a === "sheet") $("#insp").classList.toggle("peek");
+    else if (a === "sheet") { setSheet(stage.classList.contains("sheet-peek") ? "" : "peek"); $("#insp").scrollTop = 0; }
+    else if (a === "sheet-expand") { setSheet(stage.classList.contains("sheet-expanded") ? "" : "expanded"); }
   });
 
   // ------------------------------------------------------------------ panels and chrome
   function updateViews() {
-    $("#v-map").setAttribute("aria-pressed", String(state.view === "map"));
-    $("#v-focus").setAttribute("aria-pressed", String(state.view === "focus"));
+    $("#v-analytics").setAttribute("aria-pressed", String(analyticsOpen));
+    $("#v-map").setAttribute("aria-pressed", String(!analyticsOpen && state.view === "map"));
+    $("#v-focus").setAttribute("aria-pressed", String(!analyticsOpen && state.view === "focus"));
     const can = state.focus != null || state.sel?.kind === "report";
     $("#v-focus").disabled = !can;
     $("#v-focus").title = can ? "Focus graph" : "Select a report first";
@@ -1325,7 +1506,8 @@ details.narr .narr-text { margin-top: 8px; font-size: var(--fs-sm); line-height:
       if (focus.req.length) parts.push(`<span>must share: ${focus.req.map(f => esc(short(F[f].label))).join(", ")}</span>`);
       parts.push(`<span>drag nodes · hover to trace links · double-click a report to re-center</span>`);
     }
-    parts.push(`<span><b>${META.n_llm_coded.toLocaleString()}</b> coded by the local LLM</span>`);
+    if (META.n_summaries) parts.push(`<span><b>${META.n_summaries.toLocaleString()}</b> narrative summaries</span>`);
+    else if (META.n_llm_coded) parts.push(`<span><b>${META.n_llm_coded.toLocaleString()}</b> coded by the local LLM</span>`);
     $("#hud").innerHTML = parts.join("");
   }
   function buildLeft() {
@@ -1336,10 +1518,10 @@ details.narr .narr-text { margin-top: 8px; font-size: var(--fs-sm); line-height:
     $("#legend").innerHTML = `<span><i class="shape round" style="--c:${INK}"></i>Report</span><span><i class="shape sq" style="--c:${INK2}"></i>Shared factor</span>`
       + TYPES.map(t => `<span><i class="${t.text ? "swatch dash" : "shape sq"}" style="--c:${COL[t.id]}"></i>${esc(t.label)}</span>`).join("");
     $("#about").innerHTML = `
-      <p><strong>Reports.</strong> ${esc(META.scope)}. Source: ${esc(META.source)}. ASRS reports are voluntary and unverified, so counts here say nothing about how often anything happens.</p>
-      <p><strong>Map.</strong> Reports are placed by how similar their narratives are (t-SNE). Regions are dense areas, named after the analyst codes most over-represented in them.</p>
+      <p><strong>Reports.</strong> ${esc(META.scope)}. Source: ${esc(META.source)}. ASRS reports are voluntary and unverified; NTSB records are investigations. Their coverage and reporting thresholds differ, so counts are not comparable event rates.</p>
+      <p><strong>Map.</strong> Reports are placed by how similar their narratives are (t-SNE). Regions are dense areas, named after the coded factors most over-represented in them. Source colours distinguish ASRS and NTSB; ≈ marks estimated ASRS dates.</p>
       <p><strong>Links.</strong> Two reports link through every factor they share; a rare shared factor counts for more than a common one. ASRS analysts coded event type, phase, human factors, route and navigation, weather, components (mapped here to ATA chapters) and outcome. ${esc(META.llm)} read each narrative and named the events, causes and equipment involved, plus a few cause-and-effect links; phrases common enough to link reports become the factors marked AI. The model's labels are not backed by quotes or checked by hand. Text similarity uses ${esc(META.embeddings)}.</p>
-      <p><strong>Use with care.</strong> A link means two reports resemble each other, not that they share a cause. Read the narratives before drawing conclusions. Not affiliated with NASA.</p>`;
+      <p><strong>Use with care.</strong> A link means two reports resemble each other, not that they share a cause. Read the narratives before drawing conclusions. Similarity does not establish a shared incident or a causal relationship. Not affiliated with NASA or the NTSB.</p>`;
     paintWeights();
   }
   function paintWeights() {
@@ -1361,11 +1543,41 @@ details.narr .narr-text { margin-top: 8px; font-size: var(--fs-sm); line-height:
   $("#n-rel").oninput = e => { state.nRel = +e.target.value; $("#n-rel-out").textContent = state.nRel; if (state.view === "focus") { buildFocus(state.focus); renderHud(); requestDraw(); } };
   $("#n-hub").oninput = e => { state.nHubs = +e.target.value; $("#n-hub-out").textContent = state.nHubs; if (state.view === "focus") { buildFocus(state.focus); renderHud(); requestDraw(); } };
   $("#text-links").onchange = e => { state.textLinks = e.target.checked; if (state.view === "focus") { buildFocus(state.focus); requestDraw(); } };
+  function closeAnalytics() {
+    const wasOpen = analyticsOpen;
+    if (location.hash === "#analytics") setHash("");
+    analyticsOpen = false;
+    stage.classList.remove("analytics");
+    document.body.classList.remove("analytics-active");
+    $("#analytics").hidden = true;
+    if (wasOpen) resize();
+    updateViews();
+  }
+  function openAnalytics() {
+    d3.select(cv).interrupt();
+    analyticsOpen = true;
+    focus.sim?.stop();
+    closePalette();
+    stage.classList.add("analytics");
+    document.body.classList.add("analytics-active");
+    $("#analytics").hidden = false;
+    if (!analyticsMounted) {
+      SafetyAnalytics.mount($("#analytics"), R, F, {
+        report: i => { setView("map"); selectReport(i); },
+        inspect: ids => { setView("map"); state.chips = []; addChip({kind: "cohort", ids}); }
+      });
+      analyticsMounted = true;
+    }
+    setHash("analytics");
+    updateViews();
+  }
+  $("#v-analytics").onclick = openAnalytics;
   $("#v-map").onclick = () => setView("map");
   $("#v-focus").onclick = () => setView("focus");
   function setLeft(open) {
     $("#left").hidden = !open;
     $("#t-left").setAttribute("aria-pressed", String(open));
+    $("#t-left").setAttribute("aria-expanded", String(open));
     stage.classList.toggle("no-left", !open);
   }
   $("#t-left").onclick = () => setLeft($("#left").hidden);
@@ -1374,23 +1586,36 @@ details.narr .narr-text { margin-top: 8px; font-size: var(--fs-sm); line-height:
   $("#z-fit").onclick = () => fitScene(true);
 
   // ------------------------------------------------------------------ boot
-  $("#brand-sub").textContent = `${N.toLocaleString()} NASA ASRS reports · all flight phases`;
+  $("#brand-sub").textContent = `${N.toLocaleString()} reports · ASRS + NTSB`;
   setLeft(window.innerWidth > 1100);
+  mobileLayout.addEventListener("change", () => { setLeft(false); setSheet(""); hideTip(); });
   buildLeft(); buildFilters(); renderChips();
   $("#color-by").innerHTML = Object.entries(COLOR_MODES).map(([k, m]) => `<option value="${k}">${esc(m.label)}</option>`).join("");
   $("#color-by").onchange = e => setColorBy(e.target.value);
   let savedColor = null;
   try { savedColor = localStorage.getItem("asrs-color-by"); } catch (e) {}
-  setColorBy(savedColor || "phase");
+  setColorBy(savedColor || "source");
   resize();
   new ResizeObserver(resize).observe(cv);
-  const mFocus = location.hash.match(/^#focus(\d+)$/), mAcn = location.hash.match(/^#acn(\d+)$/);
-  if (mFocus && byAcn.has(mFocus[1])) openFocus(byAcn.get(mFocus[1]));
-  else {
-    fitScene(false);
-    if (mAcn && byAcn.has(mAcn[1])) selectReport(byAcn.get(mAcn[1]));
-    else { renderInspector(); renderHud(); }
+  function restoreLocation() {
+    state.compare = null;
+    if (location.hash === "#analytics") { openAnalytics(); return; }
+    closeAnalytics();
+    const hash = new URLSearchParams(location.hash.slice(1));
+    const legacyFocus = location.hash.match(/^#focus(.+)$/), legacyReport = location.hash.match(/^#acn(.+)$/);
+    const focusId = byId.get(hash.get('focus')) ?? (legacyFocus ? byAcn.get(legacyFocus[1]) : undefined);
+    const reportId = byId.get(hash.get('report')) ?? (legacyReport ? byAcn.get(legacyReport[1]) : undefined);
+    if (focusId != null) openFocus(focusId);
+    else {
+      setView("map");
+      if (reportId == null) state.sel = null;
+      fitScene(false);
+      if (reportId != null) selectReport(reportId);
+      else { renderInspector(); renderHud(); }
+    }
   }
+  restoreLocation();
+  window.addEventListener("hashchange", restoreLocation);
   if (document.fonts && document.fonts.ready) document.fonts.ready.then(requestDraw);
 })();
 </script>
