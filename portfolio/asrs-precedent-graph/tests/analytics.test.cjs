@@ -25,3 +25,15 @@ test('matrix counts a multi-coded report once per cell',()=>{
 test('CSV preserves embedded commas, quotes and newlines',()=>{
  assert.equal(A.csv([['a,b','a"b','a\nb']]),'"a,b","a""b","a\nb"');
 });
+
+test('fatality selection intersects other cohort filters and clears to all counts',()=>{
+ const rows=[0,1,5,10,11].map((fatalities,i)=>({src:1,date:'2020-01',f:[1],hay:'fuel leak',fatalities,i}));
+ rows.push({src:0,date:'2020-01',f:[1],hay:'fuel leak',i:5});
+ const f={source:'',from:2020,to:2021,query:'fuel',factors:[1]};
+ assert.deepEqual(A.select(rows,{...f,fatalities:'2-5'}),[rows[2]]);
+ assert.deepEqual(A.select(rows,{...f,fatalities:'unknown'}),[rows[5]]);
+ assert.deepEqual(A.select(rows,{...f,fatalities:'0'}),[rows[0]]);
+ assert.deepEqual(A.select(rows,{...f,source:'ASRS',fatalities:'1'}),[]);
+ assert.deepEqual(A.select(rows,{...f,query:'landing',fatalities:'11+'}),[]);
+ assert.deepEqual(A.select(rows,{...f,fatalities:''}),rows);
+});

@@ -1,12 +1,14 @@
 /* Investigator-oriented descriptive analytics over the exported report catalogue. */
 (function (root) {
   'use strict';
+  const U = typeof module !== 'undefined' && module.exports ? require('./unified.js') : root.UnifiedReports;
   const source = r => r.src === 1 ? 'NTSB' : 'ASRS';
   const count = n => n.toLocaleString();
   const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   function select(reports, filters) {
     const words = filters.query.toLowerCase().trim().split(/\s+/).filter(Boolean);
     return reports.filter(r => (!filters.source || source(r) === filters.source)
+      && U.matchesFatalities(r, filters.fatalities)
       && +r.date.slice(0,4) >= filters.from && +r.date.slice(0,4) <= filters.to
       && filters.factors.every(f => r.f.includes(f))
       && words.every(w => r.hay.includes(w)));
@@ -44,13 +46,13 @@
   }
   function mount(host, reports, facets, callbacks) {
     const years = [...new Set(reports.map(r => +r.date.slice(0,4)))].sort((a,b)=>a-b);
-    const state = {source:'',from:years[0],to:years.at(-1),query:'',factors:[],layer:'event',sort:'newest'};
+    const state = {source:'',fatalities:'',from:years[0],to:years.at(-1),query:'',factors:[],layer:'event',sort:'newest'};
     const names = {event:'Event type',phase:'Flight phase',system:'Aircraft system',human:'Human factors',weather:'Weather & light',response:'Response & outcome'};
     const label = id => facets[id].label.replace(/^(Aircraft|Location): /,'');
     let cohort = reports, exportUrl = null;
     host.innerHTML = `<div class="an-shell"><header class="an-heading"><div><p class="label">Collection analysis / ASRS + NTSB</p><h2>Safety analytics</h2><p>Find recurring patterns, narrow an investigation and return to the source reports.</p></div><button class="btn ghost" data-an="export">Export cohort CSV ↓</button></header>
-      <div class="an-controls"><label>Reporting system<select id="an-source"><option value="">ASRS + NTSB</option> <option>ASRS</option><option>NTSB</option></select></label><label>From year<select id="an-from">${years.map(y=>`<option>${y}</option>`).join('')}</select></label><label>To year<select id="an-to">${years.map(y=>`<option ${y===state.to?'selected':''}>${y}</option>`).join('')}</select></label><label class="an-query">Search summaries & metadata<input id="an-query" type="search" placeholder="e.g. fuel leak, runway excursion, aircraft or case ID"></label><button class="btn ghost" data-an="reset">Reset</button></div>
-      <div id="an-export-status" role="status"></div><div id="an-chips" class="an-chips"></div><p class="an-caveat">Collection counts, not accident rates. ASRS is voluntary reporting; NTSB is an investigation collection. Coverage differs by source and year. Multiple reports can describe one incident; the latest year may be incomplete.</p>
+      <div class="an-controls"><label>Reporting system<select id="an-source"><option value="">ASRS + NTSB</option> <option>ASRS</option><option>NTSB</option></select></label><label>Fatalities<select id="an-fatalities"><option value="">All fatality counts</option>${U.fatalityBuckets.map(b=>`<option value="${b.id}">${b.label}</option>`).join('')}</select></label><label>From year<select id="an-from">${years.map(y=>`<option>${y}</option>`).join('')}</select></label><label>To year<select id="an-to">${years.map(y=>`<option ${y===state.to?'selected':''}>${y}</option>`).join('')}</select></label><label class="an-query">Search summaries & metadata<input id="an-query" type="search" placeholder="e.g. fuel leak, runway excursion, aircraft or case ID"></label><button class="btn ghost" data-an="reset">Reset</button></div>
+      <div id="an-export-status" role="status"></div><div id="an-chips" class="an-chips"></div><p class="an-caveat">Collection counts, not accident rates. ASRS is voluntary reporting; NTSB is an investigation collection. Coverage differs by source and year. Fatality buckets use NTSB event counts; ASRS and missing counts are unknown, never zero. Multiple reports can describe one incident; the latest year may be incomplete.</p>
       <div id="an-content"></div></div>`;
     const $ = s => host.querySelector(s);
     function refresh() {
@@ -74,7 +76,7 @@
       const coverageRows=Object.entries(names).map(([l,name])=>`<tr><th>${name}</th><td>${pct(a.coverage.ASRS[l]||0,a.totals.ASRS)} <small>(${count(a.coverage.ASRS[l]||0)})</small></td><td>${pct(a.coverage.NTSB[l]||0,a.totals.NTSB)} <small>(${count(a.coverage.NTSB[l]||0)})</small></td></tr>`).join('');
       const queue=cohort.slice().sort((x,y)=>state.sort==='oldest'?x.date.localeCompare(y.date):y.date.localeCompare(x.date)).slice(0,30);
       $('#an-content').innerHTML=`<div class="an-kpis">${kpis.map(([v,l])=>`<div><strong>${v}</strong><span>${l}</span></div>`).join('')}</div>
-        ${!total?'<div class="an-empty"><h3>No reports match this cohort</h3><p>Remove a factor or broaden the year range or search.</p></div>':''}
+        ${!total?'<div class="an-empty"><h3>No reports match this cohort</h3><p>Remove a factor or broaden the year range, fatality bucket or search.</p></div>':''}
         <div class="an-grid"><section class="an-panel an-wide"><div class="an-panel-head"><div><p class="label">01 / Time & coverage</p><h3>Reports by recorded year</h3></div><div class="an-legend"><span><i class="src-0"></i>ASRS coded</span><span><i class="src-2"></i>ASRS narrative only ≈</span><span><i class="src-1"></i>NTSB</span></div></div><div class="an-years">${bars}</div><p class="hint">Click a year to isolate it. ≈ Newer ASRS dates are estimated from report identifiers. Changes can reflect collection coverage rather than changes in safety.</p></section>
         <section class="an-panel an-wide"><div class="an-panel-head"><div><p class="label">02 / Recurring patterns</p><h3>What is appearing in each source?</h3></div><label>Factor category<select id="an-layer">${Object.entries(names).map(([id,n])=>`<option value="${id}" ${state.layer===id?'selected':''}>${n}</option>`).join('')}</select></label></div><div class="an-factor-head"><span>Most frequent coded factors</span><span>ASRS · % of ${count(a.totals.ASRS)} reports</span><span>NTSB · % of ${count(a.totals.NTSB)} reports</span></div>${factorRows||'<p class="hint">No coded factors in this category.</p>'}<p class="hint">Click a factor to narrow the cohort. Percentages use all selected reports in each source, including uncoded reports. A report can have several factors; bars need not sum to 100%. Identical labels are aligned; different taxonomies are retained.</p></section>
         <section class="an-panel an-wide"><p class="label">03 / Investigation leads</p><h3>Where do event types meet flight phases?</h3>${heat}<p class="hint">Five most frequent phases and events in this cohort. Cells count reports containing both codes, not inferred causal relationships. Click a cell to require both factors.</p></section>
@@ -86,6 +88,7 @@
     }
     let timer;
     $('#an-query').oninput=e=>{state.query=e.target.value;clearTimeout(timer);timer=setTimeout(refresh,160);};
+    $('#an-fatalities').onchange=e=>{state.fatalities=e.target.value;refresh();};
     $('#an-source').onchange=e=>{state.source=e.target.value;refresh();};
     $('#an-from').onchange=e=>{state.from=+e.target.value;state.to=Math.max(state.from,state.to);$('#an-to').value=state.to;refresh();};
     $('#an-to').onchange=e=>{state.to=+e.target.value;state.from=Math.min(state.from,state.to);$('#an-from').value=state.from;refresh();};
@@ -97,14 +100,14 @@
       if(act==='cell') {for(const f of [+b.dataset.phase,+b.dataset.event])if(!state.factors.includes(f))state.factors.push(f);refresh();}
       if(act==='remove'){state.factors=state.factors.filter(f=>f!==id);refresh();}
       if(act==='year'){state.from=state.to=+b.dataset.year;$('#an-from').value=state.from;$('#an-to').value=state.to;refresh();}
-      if(act==='reset'){state.source='';state.from=years[0];state.to=years.at(-1);state.query='';state.factors=[];$('#an-source').value='';$('#an-from').value=state.from;$('#an-to').value=state.to;$('#an-query').value='';refresh();}
+      if(act==='reset'){state.source='';state.fatalities='';$('#an-fatalities').value='';state.from=years[0];state.to=years.at(-1);state.query='';state.factors=[];$('#an-source').value='';$('#an-from').value=state.from;$('#an-to').value=state.to;$('#an-query').value='';refresh();}
       if(act==='report')callbacks.report(id);
       if(act==='inspect')callbacks.inspect(cohort.map(r=>r.i));
       if(act==='export'){
         clearTimeout(timer); refresh();
         // Spreadsheet readers must treat source text as text, including formula-like prefixes.
         const safe=s=>/^[=+\-@\t\r]/.test(String(s||''))?"'"+s:s;
-        const rows=[['document_id','source','display_id','date','date_estimated','aircraft','summary','coded_factors'],...cohort.map(r=>[r.id||r.acn,source(r),r.acn,r.date,r.de?true:false,r.aircraft,r.summary||r.synopsis,r.f.filter(f=>facets[f].src!=='llm').map(f=>facets[f].label).join('; ')].map(safe))];
+        const rows=[['document_id','source','display_id','date','date_estimated','aircraft','fatalities','fatality_bucket','summary','coded_factors'],...cohort.map(r=>[r.id||r.acn,source(r),r.acn,r.date,r.de?true:false,r.aircraft,U.fatalityCount(r),U.fatalityBucket(r),r.summary||r.synopsis,r.f.filter(f=>facets[f].src!=='llm').map(f=>facets[f].label).join('; ')].map(safe))];
         if(exportUrl)URL.revokeObjectURL(exportUrl);
         exportUrl=URL.createObjectURL(new Blob(['\uFEFF'+csv(rows)],{type:'text/csv;charset=utf-8'}));
         const a=document.createElement('a');a.href=exportUrl;a.download='aviation-report-cohort.csv';a.textContent=`Save CSV · ${count(cohort.length)} reports ↓`;a.className='btn ghost';

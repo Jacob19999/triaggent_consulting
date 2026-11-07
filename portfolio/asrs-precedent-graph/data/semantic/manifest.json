@@ -1,0 +1,43 @@
+{
+  "version": 1,
+  "model": "Xenova/all-MiniLM-L6-v2",
+  "revision": "751bff37182d3f1213fa05d7196b954e230abad9",
+  "dimensions": 384,
+  "reports": 91827,
+  "max_length": 256,
+  "dtype": "int8",
+  "text": "AI summary (synopsis fallback)",
+  "ids_sha256": "bfc7b0849d89a8b91a6a3616b4db30b09c8be46180db22dafcaf4a5357159790",
+  "shards": [
+    {
+      "file": "vectors-0-6a195b6d40824573.bin",
+      "start": 0,
+      "rows": 20000,
+      "sha256": "6a195b6d4082457316c3bcd1dcec91f797bb18b58f39cbe318ecac87312363b3"
+    },
+    {
+      "file": "vectors-20000-3e5ddfe7e1e076f7.bin",
+      "start": 20000,
+      "rows": 20000,
+      "sha256": "3e5ddfe7e1e076f7599f66ee99bb91245ad8c576c74127a3621171d7192a2e4c"
+    },
+    {
+      "file": "vectors-40000-8bc824e71fff8f3f.bin",
+      "start": 40000,
+      "rows": 20000,
+      "sha256": "8bc824e71fff8f3fb90df9d3d4e4445a5dd3da33d6245dc8515ca15eb1e9ab28"
+    },
+    {
+      "file": "vectors-60000-d34cb01941284919.bin",
+      "start": 60000,
+      "rows": 20000,
+      "sha256": "d34cb019412849193db407aa4a95424150a28bcaaa24f0a5e577f97a0af5fa8e"
+    },
+    {
+      "file": "vectors-80000-7db790f672e9ddbb.bin",
+      "start": 80000,
+      "rows": 11827,
+      "sha256": "7db790f672e9ddbbd5c85e8bdce01aff83910c50c6ce270e024235025f70b4a7"
+    }
+  ]
+}

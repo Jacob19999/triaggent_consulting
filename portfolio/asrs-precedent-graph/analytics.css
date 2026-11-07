@@ -27,7 +27,7 @@
 .an-legend { display: flex; flex-wrap: wrap; gap: 16px; font: 400 11px var(--font-mono); color: var(--ink-2); }
 .an-legend span { display: inline-flex; align-items: center; gap: 6px; }
 .an-legend i { width: 9px; height: 9px; display: inline-block; }
-.src-0 { background: #6ba9ed; } .src-1 { background: #e8ab68; } .src-2 { background: #75b7a4; }
+.src-0 { background: #6ba9ed; } .src-1 { background: #e8ab68; } .src-2 { background: #9dc5eb; }
 .an-years { display: grid; grid-template-columns: repeat(17,minmax(34px,1fr)); gap: 9px; overflow-x: auto; padding-top: 12px; }
 .an-year { display: flex; flex-direction: column; gap: 6px; padding: 0; border: 0; background: none; cursor: pointer; font: 400 10px var(--font-mono); text-align: center; }
 .an-year:hover { color: #e8ab68; }

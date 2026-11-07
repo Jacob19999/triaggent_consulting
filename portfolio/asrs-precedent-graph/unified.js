@@ -3,9 +3,37 @@
   'use strict';
   const family = r => r.src === 1 ? 'NTSB' : 'ASRS';
   const identity = r => r.id || `${r.src === 1 ? 'NTSB' : r.src === 2 ? 'ASRSN' : 'ASRS'}:${r.acn}`;
+  const fatalityBuckets = [
+    {id:'0', label:'0 fatalities'}, {id:'1', label:'1 fatality'},
+    {id:'2-5', label:'2–5 fatalities'}, {id:'6-10', label:'6–10 fatalities'},
+    {id:'11+', label:'11+ fatalities'}, {id:'unknown', label:'Unknown / not recorded'}
+  ];
+  function fatalityCount(report) {
+    // ASRS has no comparable event-level count. Never coerce missing counts to zero.
+    return report.src === 1 && Number.isSafeInteger(report.fatalities) && report.fatalities >= 0
+      ? report.fatalities : null;
+  }
+  function fatalityBucket(report) {
+    const n = fatalityCount(report);
+    return n === null ? 'unknown' : n <= 1 ? String(n) : n <= 5 ? '2-5' : n <= 10 ? '6-10' : '11+';
+  }
+  const matchesFatalities = (report, bucket) => !bucket || fatalityBucket(report) === bucket;
   const summaryLabel = (r, model) => r.synopsis_kind === 'generated' || r.src === 2
     ? `AI summary · ${model || 'local model'}`
     : r.src === 1 ? 'NTSB probable cause' : 'ASRS analyst synopsis';
+
+  function reportSummaries(r, model) {
+    const missingCause = r.src === 1 && r.synopsis_kind === 'generated';
+    const blocks = [{
+      label: missingCause ? 'NTSB probable cause' : summaryLabel(r, model),
+      text: missingCause ? 'Probable cause unavailable in source' : r.synopsis,
+      ai: false
+    }];
+    if (r.summary && (r.src === 1 || (r.synopsis_kind !== 'generated' && r.src !== 2))) {
+      blocks.push({label: `AI narrative summary · ${model || 'local model'}`, text: r.summary, ai: true});
+    }
+    return blocks;
+  }
 
   // Only identical named concepts within a layer bridge analyst taxonomies. Keep each
   // report's original coding source; never merge an LLM inference into an official code.
@@ -54,7 +82,8 @@
       + (re.test(report.syn) ? 2 : 0)
       + (re.test((report.aircraft || '').toLowerCase()) ? 1 : 0), 0);
   }
-  const api = { family, identity, summaryLabel, normaliseFactors, crossMatches, searchScore };
+  const api = { family, identity, summaryLabel, reportSummaries, normaliseFactors, crossMatches, searchScore,
+    fatalityBuckets, fatalityCount, fatalityBucket, matchesFatalities };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else root.UnifiedReports = api;
 })(typeof globalThis !== 'undefined' ? globalThis : this);
