@@ -344,10 +344,11 @@ details.narr .narr-text { margin-top: 8px; font-size: var(--fs-sm); line-height:
       <div id="source-overlap" hidden>
         <label class="check"><input id="source-shared" type="checkbox" checked>Highlight shared ASRS ↔ NTSB patterns</label>
         <label class="source-cutoff" for="source-cutoff">Overview cosine cutoff <output id="source-cutoff-value">0.85</output></label>
-        <input id="source-cutoff" type="range" min="0.70" max="0.90" step="0.01" value="0.85">
+        <input id="source-cutoff" type="range" min="0.00" max="1.00" step="0.01" value="0.85">
         <p class="hint" id="source-link-count"></p>
         <label class="check"><input id="source-severity" type="checkbox">Show NTSB injury severity rings</label>
         <details class="source-help"><summary>How to read these marks</summary><p class="hint">Cyan halos mark reports with an other-source analogue above the cutoff. Select a report to see its six closest other-source neighbours; thicker lines mean higher narrative cosine, regardless of overview cutoff.</p>
+        <p class="hint">Cosine scales differ between embedding models. The cutoff controls which matches are highlighted; it is not a relevance probability.</p>
         <p class="hint">Larger rings mean more severe recorded NTSB injuries. No ring means no injury code in this export, not necessarily no injury. ASRS injury severity is not encoded. At overview scale, rings thin out and retain the highest coded severity in each screen cell.</p>
         <p class="hint">Map distance is approximate. Similarity does not establish the same incident or a shared cause.</p></details>
         <p class="hint" id="source-severity-legend" hidden>Injury rings: <span class="injury-key"><i style="--size:5px"></i>minor <i style="--size:8px"></i>serious <i style="--size:11px"></i>fatal</span></p>
@@ -415,6 +416,7 @@ details.narr .narr-text { margin-top: 8px; font-size: var(--fs-sm); line-height:
   <p>Each dot is an ASRS report or NTSB investigation. Colours follow the selected Colour key. Several reports can describe the same incident.</p>
   <h3>Position means similarity of narrative text</h3>
   <p>The map compresses narrative text embeddings into two dimensions using t-SNE. Nearby dots generally describe similar situations. Horizontal and vertical position have no geographic, time or severity meaning.</p>
+  <p id="map-encoder"></p>
   <p>Distance is approximate: gaps, island sizes and distances between far-apart groups are not similarity scores. Changing colours or link settings leaves these map positions fixed.</p>
   <h3>Region names are automatic descriptions</h3>
   <p>Names come from common coded factors in each cluster. Different regions can share a term: VMC means visual meteorological conditions. Read the second line to distinguish them; zoom in or open Explore for full names.</p>
@@ -561,7 +563,10 @@ details.narr .narr-text { margin-top: 8px; font-size: var(--fs-sm); line-height:
   };
 
   let analyticsOpen = false, analyticsMounted = false;
-  const sourceState = {shared:true, severity:false, cutoff:0.85};
+  const sourceState = {shared:true, severity:false,
+    cutoff:META.narrative_encoder?.condition === "epoch3" ? 0.55 : 0.85};
+  $("#source-cutoff").value = sourceState.cutoff;
+  $("#source-cutoff-value").value = sourceState.cutoff.toFixed(2);
   const injuries = R.map(r=>SourceLinks.severity(r,F));
   const injuryGroups = [[],[],[],[]];
   injuries.forEach((s,i)=>{if(s.level)injuryGroups[s.level].push(R[i]);});
@@ -1727,6 +1732,8 @@ details.narr .narr-text { margin-top: 8px; font-size: var(--fs-sm); line-height:
     $("#hud").innerHTML = parts.join("");
   }
   function buildLeft() {
+    const epoch = /^epoch(\d+)$/.exec(META.narrative_encoder?.condition || "");
+    $("#map-encoder").textContent = `The map and report links use ${epoch ? `aviation-tuned Qwen3 embeddings (epoch ${epoch[1]})` : "Qwen3 narrative embeddings"}. Meaning search uses a separate MiniLM model on your device.`;
     $("#examples").innerHTML = (META.examples || []).filter(x => byAcn.has(x.acn)).map(x => `<button type="button" data-act="focus" data-i="${byAcn.get(x.acn)}"><span>${esc(x.label)}</span><span class="n">${esc(x.acn)}</span></button>`).join("");
     $("#regions").innerHTML = REG.map(c => `<button type="button" data-act="region" data-id="${c.id}"><span>${esc(c.label)}</span><span class="n">${c.n}</span></button>`).join("");
     $("#weights").innerHTML = TYPES.map(t => `<div class="wrow" id="row-${t.id}"><span class="swatch${t.text ? " dash" : ""}" style="--c:${COL[t.id]}"></span><label for="w-${t.id}">${esc(t.label)}<small id="wv-${t.id}"></small></label><input type="range" id="w-${t.id}" min="0" max="3" step="1" value="${t.def}"></div>`).join("");

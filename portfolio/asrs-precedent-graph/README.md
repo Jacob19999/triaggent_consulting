@@ -88,7 +88,8 @@ For browser verification, use a fresh origin or clear this site's tutorial stora
 - Source scope offers all reports, ASRS (both analyst-coded and narrative-only), or NTSB.
   Estimated ASRS dates carry `≈`.
 - **Meaning** mode runs a small MiniLM model in the browser and ranks summary embeddings.
-  The map and narrative links use separate, precomputed Qwen embeddings. See the browser
+  The map and narrative links use separate, precomputed aviation-tuned Qwen3 embeddings
+  from epoch 3 (`checkpoint-3123`). See the browser
   semantic search section below for downloads, regeneration and deployment.
 - Each report's `cross` shortlist contains up to six neighbours from the other reporting
   system, using cosine similarity of mean Qwen3-Embedding-8B narrative chunk vectors. The UI
@@ -110,6 +111,29 @@ In the `cis634` checkout on the machine holding corpus v2, all summaries and cac
 ```sh
 .venv/bin/python scripts/export_precedent_graph_v2.py /path/to/staging-page --without-graph
 ```
+
+For the aviation-tuned epoch-3 map and report links, use the completed evaluation caches:
+
+```sh
+.venv/bin/python scripts/export_precedent_graph_v2.py /path/to/staging-page \
+  --without-graph --finetune-condition results/finetune_8b_v1/epoch3
+```
+
+This verifies the sealed corpus hash, checkpoint weights, evaluation fingerprint, chunk
+coverage and report order before pooling the cached chunk vectors. It rebuilds narrative
+and cross-source links, t-SNE positions and region labels. The map cache includes the vector
+content hash so a frozen layout cannot be reused for an adapted checkpoint. The export's
+`meta.narrative_encoder` records the exact checkpoint and fingerprint. Copy only `graph.json`,
+`reports/` and `narratives/` from this export; preserve `data/semantic/` and `vendor/`, which
+belong to the independent MiniLM browser search. Report IDs and order must match its manifest.
+
+Epoch 3 was selected on held-out ASRS synopsis MRR@10 (0.3930 → 0.5202). Topical dev silver
+nDCG@10 fell from 0.8413 to 0.7976; independent relevance judging is unfinished. These results
+do not validate cross-source analogues or make the cosine cutoff a relevance threshold.
+The Source overview defaults to cosine 0.55 for epoch 3 (7,597 reports / 13,582 pairs
+in the full catalogue); the slider spans 0–1. The frozen model's former 0.85 default
+would show no epoch-3 pairs, whose maximum exported cross-source cosine is 0.7989.
+This is a display default chosen from the score distribution, not a relevance calibration.
 
 Use `--without-graph` until the separate Qwen3-8B graph extraction is available. It preserves
 coded factors, summaries and narrative similarities without inventing graph-derived evidence.
