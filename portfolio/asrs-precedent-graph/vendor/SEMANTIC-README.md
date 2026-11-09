@@ -1,22 +1,23 @@
 # Browser search assets
 
-Pinned, unmodified distribution files for browser-only semantic search. No package installation
+Pinned distribution files for browser-only semantic search. No package installation
 or build step is needed at deployment time. `semantic-assets.json` records each file's SHA-256.
 The worker checks that the model/index versions agree before loading report vectors.
 
-- Transformers.js **3.8.1**: `dist/transformers.min.js` and the two
-  `dist/ort-wasm-simd-threaded.jsep.*` files from the official npm package via
-  `https://cdn.jsdelivr.net/npm/@huggingface/transformers@3.8.1/`.
+- Transformers.js **4.3.2** is fetched from jsDelivr on first use. The worker checks the
+  bundle against the official npm file's SHA-256 via Fetch subresource integrity.
+  ONNX Runtime Web **1.31.0-dev.20260914-8d85527a0** supplies the matching
+  `ort-wasm-simd-threaded.*` JS/WASM files. The plain, `jsep`, `jspi` and `asyncify`
+  variants support different browsers; only the selected variant is downloaded.
   Transformers.js Apache 2.0 licence: `transformers/LICENSE`.
   ONNX Runtime MIT licence: `transformers/ONNX-LICENSE`.
-- Model: `Xenova/all-MiniLM-L6-v2`, commit
-  `751bff37182d3f1213fa05d7196b954e230abad9`, from
-  `https://huggingface.co/Xenova/all-MiniLM-L6-v2/resolve/751bff37182d3f1213fa05d7196b954e230abad9/`.
-  Files: `config.json`, `tokenizer.json`, `tokenizer_config.json`,
-  `special_tokens_map.json` and `onnx/model_quantized.onnx`. This is the ONNX conversion
-  of `sentence-transformers/all-MiniLM-L6-v2` (Apache 2.0). Its licence is included in
-  `models/Xenova/all-MiniLM-L6-v2/LICENSE`.
+- Model: `aviation/embeddinggemma2-browser-v1`, the project's epoch-3 aviation adaptation
+  of Google's Apache-2.0 `google/embeddinggemma-2`, base revision
+  `f9972ac22e696a105c482202646979e33e4b5a1e`. The model is text-only. Its `export.json`
+  pins all eight graph, weights and tokeniser files. The manifest revision is the SHA-256
+  of that export record, not a Hugging Face branch name. The checkpoint and export method
+  are recorded beside the model; model files are installed from the completed research run.
 
-Queries are never sent to these upstream hosts at runtime: the worker disables remote model
-loading, uses local vendored files and runs single-threaded WASM without special response
-headers. Keep these files with the page when copying or deploying it.
+Query encoding runs on-device with single-threaded WASM. The CDN serves only the
+Transformers.js bundle. The worker disables remote model loading and uses the site's model,
+WASM and index files without special response headers.

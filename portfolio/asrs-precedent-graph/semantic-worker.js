@@ -8,6 +8,17 @@ async function sha256(bytes) {
   const hash = await crypto.subtle.digest('SHA-256', bytes);
   return Array.from(new Uint8Array(hash), b => b.toString(16).padStart(2, '0')).join('');
 }
+async function loadRuntime(assets) {
+  const url = `https://cdn.jsdelivr.net/npm/@huggingface/transformers@${assets.transformers}/dist/transformers.min.js`;
+  const response = await fetch(url, {integrity: assets.transformers_integrity});
+  if (!response.ok) throw new Error('Could not download Transformers.js');
+  const moduleUrl = URL.createObjectURL(new Blob([await response.arrayBuffer()], {type: 'text/javascript'}));
+  try {
+    return await import(moduleUrl);
+  } finally {
+    URL.revokeObjectURL(moduleUrl);
+  }
+}
 async function load(ids) {
   status('Downloading meaning search · first use may take a moment…');
   const response = await fetch('data/semantic/manifest.json', {cache: 'no-cache'});
@@ -16,25 +27,22 @@ async function load(ids) {
   const assetsResponse = await fetch('vendor/semantic-assets.json', {cache: 'no-cache'});
   if (!assetsResponse.ok) throw new Error('Semantic model assets are missing');
   const assets = await assetsResponse.json();
-  if (assets.model !== manifest.model || assets.revision !== manifest.revision) {
-    throw new Error('Semantic model and index versions do not match');
-  }
-  if (manifest.version !== 1 || manifest.dtype !== 'int8' || manifest.reports !== ids.length ||
-      manifest.dimensions !== 384 || !manifest.revision ||
-      manifest.ids_sha256 !== await sha256(new TextEncoder().encode(ids.join('\n')))) {
-    throw new Error('Semantic index does not match this report catalogue');
-  }
+  SemanticCore.validateManifest(manifest, assets, ids.length,
+    await sha256(new TextEncoder().encode(ids.join('\n'))));
   const modelPromise = (async () => {
-    const {pipeline, env} = await import(new URL('vendor/transformers/transformers.min.js', self.location.href).href);
-    env.allowLocalModels = true;
-    env.allowRemoteModels = false;
-    env.localModelPath = new URL('vendor/models/', self.location.href).href;
-    env.backends.onnx.wasm.wasmPaths = new URL('vendor/transformers/', self.location.href).href;
+    const modelRoot = new URL(`vendor/models/${manifest.model}/`, self.location.href);
+    const response = await fetch(new URL('export.json', modelRoot));
+    if (!response.ok || await sha256(await response.arrayBuffer()) !== manifest.model_export_sha256) {
+      throw new Error('Semantic model provenance does not match this index');
+    }
+    const [runtime, {loadAviationEncoder}] = await Promise.all([
+      loadRuntime(assets),
+      import(new URL('semantic-encoder.mjs', self.location.href).href),
+    ]);
+    runtime.env.backends.onnx.wasm.wasmPaths = new URL('vendor/transformers/', self.location.href).href;
     // A single WASM thread also works on static hosts without cross-origin isolation headers.
-    env.backends.onnx.wasm.numThreads = 1;
-    return pipeline('feature-extraction', manifest.model, {
-      revision: manifest.revision, dtype: 'q8', device: 'wasm'
-    });
+    runtime.env.backends.onnx.wasm.numThreads = 1;
+    return loadAviationEncoder(runtime, modelRoot.href, 'wasm');
   })().catch(error => {throw new Error(`Model load: ${error.message}`);});
   const indexPromise = (async () => {
     vectors = new Int8Array(manifest.reports * manifest.dimensions);
@@ -68,10 +76,7 @@ onmessage = async ({data}) => {
     let query = queries.get(data.query);
     if (!query) {
       status('Finding the closest meanings…');
-      const output = await extractor(data.query, {
-        pooling: 'mean', normalize: true, truncation: true, max_length: manifest.max_length
-      });
-      query = new Float32Array(output.data);
+      query = await extractor(data.query);
       if (queries.size > 50) queries.clear();
       queries.set(data.query, query);
     }

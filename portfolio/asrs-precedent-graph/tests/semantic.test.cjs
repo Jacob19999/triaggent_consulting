@@ -1,6 +1,21 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const {norms, rank} = require('../semantic-core.js');
+const {norms, rank, validateManifest} = require('../semantic-core.js');
+
+test('rejects mixed checkpoints, wrong prefixes and stale catalogue order', () => {
+  const sha = 'a'.repeat(64);
+  const manifest = {version:2, dtype:'int8', dimensions:256, reports:2,
+    ids_sha256:'ids', max_length:256, model_dtype:'q4', output:'sentence_embedding',
+    query_prefix:'task: search result | query: ', model:'aviation/embeddinggemma2-browser-v1',
+    revision:sha, model_export_sha256:sha};
+  const assets = {transformers:'4.3.2', model:manifest.model, revision:sha, model_export_sha256:sha};
+  validateManifest(manifest, assets, 2, 'ids');
+  assert.throws(() => validateManifest(manifest, assets, 2, 'different-order'));
+  assert.throws(() => validateManifest({...manifest, dimensions:384}, assets, 2, 'ids'));
+  assert.throws(() => validateManifest({...manifest, query_prefix:''}, assets, 2, 'ids'));
+  assert.throws(() => validateManifest(manifest, {...assets, revision:'b'.repeat(64)}, 2, 'ids'));
+  assert.throws(() => validateManifest(manifest, {...assets, model_export_sha256:'b'.repeat(64)}, 2, 'ids'));
+});
 
 test('ranks by normalised cosine, not vector magnitude or lexical overlap', () => {
   const vectors = new Int8Array([127, 0, 3, 4, 0, 127, -127, 0]);

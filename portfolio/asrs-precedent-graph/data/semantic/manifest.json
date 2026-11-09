@@ -1,43 +1,49 @@
 {
-  "version": 1,
-  "model": "Xenova/all-MiniLM-L6-v2",
-  "revision": "751bff37182d3f1213fa05d7196b954e230abad9",
-  "dimensions": 384,
+  "version": 2,
+  "model": "aviation/embeddinggemma2-browser-v1",
+  "model_export_sha256": "2d28499f661b7b5003f1f49c1429f781ac189ac47492ac93a8f3a471cfc10e58",
   "reports": 91827,
-  "max_length": 256,
+  "dimensions": 256,
   "dtype": "int8",
-  "text": "AI summary (synopsis fallback)",
+  "max_length": 256,
+  "query_prefix": "task: search result | query: ",
+  "model_dtype": "q4",
+  "output": "sentence_embedding",
+  "text": "AI summaries",
   "ids_sha256": "bfc7b0849d89a8b91a6a3616b4db30b09c8be46180db22dafcaf4a5357159790",
   "shards": [
     {
-      "file": "vectors-0-6a195b6d40824573.bin",
+      "file": "vectors-0-9dc65e817904ad21.bin",
       "start": 0,
       "rows": 20000,
-      "sha256": "6a195b6d4082457316c3bcd1dcec91f797bb18b58f39cbe318ecac87312363b3"
+      "sha256": "9dc65e817904ad2112ebf8b6b3d517b470c4ddd43c9f7f8756836ca786258f82"
     },
     {
-      "file": "vectors-20000-3e5ddfe7e1e076f7.bin",
+      "file": "vectors-20000-0db17c53a1990bd1.bin",
       "start": 20000,
       "rows": 20000,
-      "sha256": "3e5ddfe7e1e076f7599f66ee99bb91245ad8c576c74127a3621171d7192a2e4c"
+      "sha256": "0db17c53a1990bd153bed2031cd52ce7e281c604faab4a4eb6e3535d4ae4d8c2"
     },
     {
-      "file": "vectors-40000-8bc824e71fff8f3f.bin",
+      "file": "vectors-40000-2cee4ed22e42f428.bin",
       "start": 40000,
       "rows": 20000,
-      "sha256": "8bc824e71fff8f3fb90df9d3d4e4445a5dd3da33d6245dc8515ca15eb1e9ab28"
+      "sha256": "2cee4ed22e42f42854d798e5409f17dba1eb240daba1c42e6186f4fd767d4ff2"
     },
     {
-      "file": "vectors-60000-d34cb01941284919.bin",
+      "file": "vectors-60000-2d5df77cf1cdb6d4.bin",
       "start": 60000,
       "rows": 20000,
-      "sha256": "d34cb019412849193db407aa4a95424150a28bcaaa24f0a5e577f97a0af5fa8e"
+      "sha256": "2d5df77cf1cdb6d47b5d32e1c85a07c8a61f14df02084271cc1e1cd6a55df7b6"
     },
     {
-      "file": "vectors-80000-7db790f672e9ddbb.bin",
+      "file": "vectors-80000-08e253aa1df6b10b.bin",
       "start": 80000,
       "rows": 11827,
-      "sha256": "7db790f672e9ddbbd5c85e8bdce01aff83910c50c6ce270e024235025f70b4a7"
+      "sha256": "08e253aa1df6b10b56c830de49baeaa6f1374e26470baca6336d46d0bcc670f7"
     }
-  ]
+  ],
+  "data_manifest_sha256": "62faafa9aa60b80c8d9e91d1a9e8a51b6c67e0bb1a86d1202a3161c92d13d207",
+  "browser_validation_pending": false,
+  "revision": "2d28499f661b7b5003f1f49c1429f781ac189ac47492ac93a8f3a471cfc10e58"
 }

@@ -87,7 +87,8 @@ For browser verification, use a fresh origin or clear this site's tutorial stora
   rank above matches in source abstracts; the number of coded factors is not a ranking boost.
 - Source scope offers all reports, ASRS (both analyst-coded and narrative-only), or NTSB.
   Estimated ASRS dates carry `≈`.
-- **Meaning** mode runs a small MiniLM model in the browser and ranks summary embeddings.
+- **Meaning** mode runs an aviation-tuned EmbeddingGemma 2 text encoder in the browser
+  and ranks summary embeddings.
   The map and narrative links use separate, precomputed aviation-tuned Qwen3 embeddings
   from epoch 3 (`checkpoint-3123`). See the browser
   semantic search section below for downloads, regeneration and deployment.
@@ -125,7 +126,7 @@ and cross-source links, t-SNE positions and region labels. The map cache include
 content hash so a frozen layout cannot be reused for an adapted checkpoint. The export's
 `meta.narrative_encoder` records the exact checkpoint and fingerprint. Copy only `graph.json`,
 `reports/` and `narratives/` from this export; preserve `data/semantic/` and `vendor/`, which
-belong to the independent MiniLM browser search. Report IDs and order must match its manifest.
+belong to the independent Gemma browser search. Report IDs and order must match its manifest.
 
 Epoch 3 was selected on held-out ASRS synopsis MRR@10 (0.3930 → 0.5202). Topical dev silver
 nDCG@10 fell from 0.8413 to 0.7976; independent relevance judging is unfinished. These results
@@ -218,7 +219,7 @@ reports in the current export have counts: 19,784 zero; 2,579 one; 2,037 two to 
 ## Browser semantic search (Vercel Hobby)
 
 The search palette defaults to **Meaning**. It embeds the query on the visitor's device and
-ranks all report summaries by cosine similarity using MiniLM-L6-v2. Select **Keywords** for
+ranks all report summaries by cosine similarity using aviation-tuned EmbeddingGemma 2. Select **Keywords** for
 the original all-words matching. Case numbers, numeric aircraft types and uppercase airport
 codes use direct keyword lookup in either mode. Source, year, place, fatality, factor and
 region filters restrict the candidate set **before** ranking. The top eight results display
@@ -227,10 +228,12 @@ exhaustive relevance set; cosine is not a probability or an assessment of safety
 
 This works as static files on Vercel Hobby: there is no API key, inference Function, database
 or paid search service. Static delivery still counts towards the hosting plan's transfer
-allowance. The 33.6 MiB int8 index downloads on first meaning search; Transformers.js 3.8.1,
-its WASM runtime and the small quantised ONNX model are vendored and served by the same
-site. Total additional uncompressed assets are about 78 MiB (including the index). Model
-assets use browser caching. Queries are processed locally and are not
+allowance. The 22.4 MiB int8 index downloads on first meaning search. The worker fetches
+Transformers.js 4.3.2 from jsDelivr with a pinned integrity hash. The site serves the
+matching WASM variants, tokeniser and q4 ONNX model. Model/tokeniser files total 259 MiB,
+before the index and selected WASM runtime.
+The runtime loads only the variant supported by the browser. Model assets use browser
+caching. Queries are processed locally and are not
 sent to an inference provider. A worker keeps encoding and ranking off the map's UI thread.
 First-use loading may take time on slow connections or phones. Loading failures are labelled
 and leave keyword search available. Pending results are discarded when queries, modes or
@@ -238,22 +241,37 @@ filters change or the palette closes.
 
 This summary search is a separate model and index from the Qwen3-Embedding-8B **narrative**
 links already on the map. It searches AI summaries (synopsis fallback), not full narratives.
-Document vectors use the original MiniLM checkpoint; browser queries use its q8 ONNX
-conversion. Both use mean pooling, unit normalisation and a 256-token limit. Document vectors
+Document vectors use aviation checkpoint `checkpoint-1506` (epoch 3); browser queries use
+its block-16 q4 ONNX conversion with row-int8 vocabulary lookup and float32 activation
+tensors. Both use the published query/document prefixes, mean pooling and projection,
+256-dimensional Matryoshka output, unit normalisation and a 256-token limit. Document vectors
 are quantised symmetrically per report; scoring divides by the stored int8 vector's norm.
 Minor numerical differences from float32 inference are expected.
 
-After replacing the report export, regenerate this index from the `cis634` checkout:
+The checkpoint was selected on 1,000 held-out incident queries searching 91,827 summaries.
+Quantised-query development MRR@10 is 0.5182, versus 0.3123 for the previous frozen MiniLM.
+These are development results from automatically screened query–summary pairs, not human
+relevance judgements or a measure of operational safety. Topical development labels are silver.
+
+Release checks verified every model and vector hash and matched all 91,827 summaries to
+the encoded catalogue. The trained package returned the expected top report for both
+conversion probes in the browser. A 412 × 780 viewport showed the Meaning results and
+opened the closest 100 on the map without horizontal overflow.
+
+Install the sealed package from the `cis634` checkout, preserving exact summary text:
 
 ```sh
-.venv/bin/python scripts/export_semantic_search.py /path/to/page \
-  --browser-revision 751bff37182d3f1213fa05d7196b954e230abad9
+.venv/bin/python scripts/install_browser_encoder.py \
+  models/finetuning/embeddinggemma2-browser-v1/browser /path/to/page \
+  --catalogue cache/browser-release-catalogue.jsonl
 ```
 
 Commit and deploy `data/semantic/manifest.json` with **all** the binary shards it names,
-`semantic-core.js`, `semantic-worker.js`, `semantic-search.js`, `vendor/transformers/`,
+`semantic-core.js`, `semantic-worker.js`, `semantic-encoder.mjs`, `semantic-search.js`, `vendor/transformers/`,
 `vendor/models/`, `vendor/semantic-assets.json` and `index.html`. No Vercel
-build command or server configuration is required. Shards are below 8 MB and named by their
-content hash. Report identity/order and every downloaded shard are SHA-256 checked; a stale
+build command or server configuration is required. Deploy through the Git integration;
+the complete source exceeds the Hobby CLI source-upload limit. Vector shards are below
+6 MB and named by their content hash; weight shards are at most 64 MiB. Report identity/order,
+model provenance and every downloaded index shard are SHA-256 checked; a stale
 catalogue/index pairing fails visibly instead of returning the wrong report. This is an
 independent UI export and does not alter benchmark caches or reported results.

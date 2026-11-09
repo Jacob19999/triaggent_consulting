@@ -1733,7 +1733,7 @@ details.narr .narr-text { margin-top: 8px; font-size: var(--fs-sm); line-height:
   }
   function buildLeft() {
     const epoch = /^epoch(\d+)$/.exec(META.narrative_encoder?.condition || "");
-    $("#map-encoder").textContent = `The map and report links use ${epoch ? `aviation-tuned Qwen3 embeddings (epoch ${epoch[1]})` : "Qwen3 narrative embeddings"}. Meaning search uses a separate MiniLM model on your device.`;
+    $("#map-encoder").textContent = `The map and report links use ${epoch ? `aviation-tuned Qwen3 embeddings (epoch ${epoch[1]})` : "Qwen3 narrative embeddings"}. Meaning search uses a separate aviation-tuned EmbeddingGemma 2 model on your device.`;
     $("#examples").innerHTML = (META.examples || []).filter(x => byAcn.has(x.acn)).map(x => `<button type="button" data-act="focus" data-i="${byAcn.get(x.acn)}"><span>${esc(x.label)}</span><span class="n">${esc(x.acn)}</span></button>`).join("");
     $("#regions").innerHTML = REG.map(c => `<button type="button" data-act="region" data-id="${c.id}"><span>${esc(c.label)}</span><span class="n">${c.n}</span></button>`).join("");
     $("#weights").innerHTML = TYPES.map(t => `<div class="wrow" id="row-${t.id}"><span class="swatch${t.text ? " dash" : ""}" style="--c:${COL[t.id]}"></span><label for="w-${t.id}">${esc(t.label)}<small id="wv-${t.id}"></small></label><input type="range" id="w-${t.id}" min="0" max="3" step="1" value="${t.def}"></div>`).join("");

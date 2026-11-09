@@ -1,0 +1,56 @@
+{
+  "checkpoint": "models/finetuning/embeddinggemma2-browser-v1/checkpoint-1506",
+  "base_revision": "f9972ac22e696a105c482202646979e33e4b5a1e",
+  "export_version": 2,
+  "matmul_bits": 4,
+  "matmul_block_size": 16,
+  "text_only": true,
+  "dtype": "int4 MatMul / int8 embedding lookup / float32 activations",
+  "dimensions": 256,
+  "max_length": 256,
+  "query_prefix": "task: search result | query: ",
+  "document_prefix": "title: none | text: ",
+  "onnx_probe_cosines": [
+    0.9809611439704895,
+    0.9772788286209106,
+    0.9793399572372437
+  ],
+  "native_mask_max_difference": 1.4901161193847656e-08,
+  "runtime": "@huggingface/transformers@4.3.2",
+  "browser_test_pending": true,
+  "source_sha256": "86871601a267781d8ae882315a619c30d2e7b5659676b44ef1838952feefb162",
+  "files": {
+    "config.json": {
+      "sha256": "b91c17ee2bbfe4db4562da9eac292cc1d4d5d1547adf61303baf21d72fd1c3f0",
+      "bytes": 3193
+    },
+    "tokenizer.json": {
+      "sha256": "8228146e873f0cf434e8ce247e13698a54e909a0de0eb46010aac6d7119d6029",
+      "bytes": 32170763
+    },
+    "tokenizer_config.json": {
+      "sha256": "dd3c3a2bec337ea103659ae0adf33b22ff34487d5d9da9acbeb91d239042097e",
+      "bytes": 1734
+    },
+    "onnx/model_q4.onnx": {
+      "sha256": "638c09adb3364891c5db9bb9c69a07744770a0230aa54b97b8c2cb05cd87542a",
+      "bytes": 1293645
+    },
+    "onnx/model_q4.onnx_data": {
+      "sha256": "d65b39089943739c813543c40c28dc1c0f06a1913c697db4a204620fcf5267f4",
+      "bytes": 67108864
+    },
+    "onnx/model_q4.onnx_data_1": {
+      "sha256": "955559a6389171ba20952b7e21c18d7fbfce1c5ad76d87e80da9ecb7638aad40",
+      "bytes": 67108864
+    },
+    "onnx/model_q4.onnx_data_2": {
+      "sha256": "9b5805465cae18c2999bdc2473167b2636d50be98d267a472d83ff57d00d5f64",
+      "bytes": 67022848
+    },
+    "onnx/model_q4.onnx_data_3": {
+      "sha256": "6a94ff80a753bfac8ba929d05ac2e488028a54b4771ab5b4a9d3489315f38b76",
+      "bytes": 36864000
+    }
+  }
+}

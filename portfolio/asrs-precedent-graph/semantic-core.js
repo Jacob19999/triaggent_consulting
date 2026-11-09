@@ -1,6 +1,23 @@
-/* Pure cosine ranking for the browser's independent MiniLM summary index. */
+/* Catalogue/model contract and cosine ranking for the independent summary index. */
 (function (root) {
   'use strict';
+  function validateManifest(manifest, assets, reportCount, idsSha256) {
+    if (manifest.version !== 2 || manifest.dtype !== 'int8' || manifest.dimensions !== 256 ||
+        manifest.reports !== reportCount || manifest.ids_sha256 !== idsSha256 ||
+        manifest.max_length !== 256 || manifest.model_dtype !== 'q4' ||
+        manifest.query_prefix !== 'task: search result | query: ' ||
+        manifest.output !== 'sentence_embedding' ||
+        !/^[\w.-]+\/[\w.-]+$/.test(manifest.model) ||
+        !/^[a-f0-9]{64}$/.test(manifest.revision)) {
+      throw new Error('Semantic index does not match this report catalogue or encoder');
+    }
+    if (assets.model !== manifest.model || assets.revision !== manifest.revision ||
+        assets.transformers !== '4.3.2' ||
+        manifest.model_export_sha256 !== manifest.revision ||
+        assets.model_export_sha256 !== manifest.model_export_sha256) {
+      throw new Error('Semantic model and index versions do not match');
+    }
+  }
   function norms(vectors, dimensions) {
     if (!Number.isInteger(dimensions) || dimensions < 1 || vectors.length % dimensions) {
       throw new Error('Invalid semantic index dimensions');
@@ -38,7 +55,7 @@
     }
     return best;
   }
-  const api = {norms, rank};
+  const api = {norms, rank, validateManifest};
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else root.SemanticCore = api;
 })(typeof globalThis !== 'undefined' ? globalThis : this);
